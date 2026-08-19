@@ -3,6 +3,9 @@
 # dependencies
 node_modules/
 
+# kişisel Claude Code araç ayarları — proje kodunun parçası değil
+.claude/
+
 # Expo
 .expo/
 dist/
