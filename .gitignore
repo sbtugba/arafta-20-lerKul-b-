@@ -5,6 +5,8 @@ node_modules/
 
 # kişisel Claude Code araç ayarları — proje kodunun parçası değil
 .claude/
+AGENTS.md
+CLAUDE.md
 
 # Expo
 .expo/
