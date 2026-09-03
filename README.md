@@ -11,6 +11,12 @@ Uygulamanın tamamı bilinçli olarak **kişi değil konu takibi** üzerine kuru
 grafiği, "önerilen kişiler", başkasının profilini gezme gibi sosyal ağ mekanikleri yok.
 İnsanlar hashtag takip eder, birbirini değil.
 
+## Ekran görüntüleri
+
+| Karşılama | Keşfet — Bugünün Nabzı | Akış |
+|---|---|---|
+| <img src="docs/screenshots/01-giris.jpg" width="240" alt="Karşılama ekranı"> | <img src="docs/screenshots/02-kesfet.jpg" width="240" alt="Keşfet ekranı"> | <img src="docs/screenshots/03-akis.jpg" width="240" alt="Akış ekranı"> |
+
 ## Özellikler
 
 - **Kimlik doğrulama** — e-posta + şifre, kayıtta kullanıcı adı (debounce'lu müsaitlik
