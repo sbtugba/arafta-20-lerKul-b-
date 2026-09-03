@@ -124,13 +124,11 @@ export default function ThresholdScreen() {
 
   if (phase === 'breath') {
     const bg = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.bordo, colors.cream] });
-    const wordColor = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.goldPale, colors.bordo] });
     const lineColor = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.cream, colors.bordo] });
 
     return (
       <Animated.View key="breath" style={[styles.container, { backgroundColor: bg }]}>
         <SafeAreaView style={styles.breathSafe}>
-          <Animated.Text style={[styles.wordmark, styles.breathWord, { color: wordColor }]}>arafta.</Animated.Text>
           <View style={styles.breathLineWrap}>
             <BreathLine active={breathStep === 1} color={lineColor}>
               Henüz hiçbir şey yerine oturmadı.
@@ -298,10 +296,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  breathWord: {
-    position: 'absolute',
-    top: 8,
   },
   breathLineWrap: {
     paddingHorizontal: 40,
