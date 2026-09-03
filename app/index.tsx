@@ -27,8 +27,7 @@ export default function ThresholdScreen() {
 
   // breath phase — the "kısa nefes alanı" between the threshold and authentication
   const breathWarmth = useRef(new Animated.Value(0)).current;
-  const line1Opacity = useRef(new Animated.Value(0)).current;
-  const line2Opacity = useRef(new Animated.Value(0)).current;
+  const [breathStep, setBreathStep] = useState<0 | 1 | 2>(0);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
@@ -94,35 +93,34 @@ export default function ThresholdScreen() {
 
     Animated.timing(leave, { toValue: 1, duration: reduceMotion ? 0 : 400, useNativeDriver: true }).start(() => {
       setPhase('breath');
-      runBreath();
     });
   }
 
-  function runBreath() {
+  // Nefes ekranı zamanlaması — her satır kendi mount'unda fade-in yapar (bkz. BreathLine),
+  // burada sadece hangi satırın aktif olduğunu ve ne zaman auth'a geçileceğini yönetiyoruz.
+  // Eski hali Animated.sequence + tek Animated.Value ile karışık native/JS driver kullanıp
+  // ilk satırı yavaş cihazda görünmeden atlıyordu.
+  useEffect(() => {
+    if (phase !== 'breath') return;
     if (reduceMotion) {
       router.replace('/(auth)');
       return;
     }
 
-    // breathWarmth renk (backgroundColor/color) interpolasyonu sürüyor — bu native driver'da
-    // desteklenmiyor. Native-driver'lı diğer animasyonlarla aynı parallel/sequence içine
-    // konursa RN "moved to native" hatası atıyor, o yüzden tamamen ayrı bir start() ile
-    // kendi zamanlamasında (delay ile) çalıştırıyoruz.
-    Animated.timing(breathWarmth, { toValue: 1, duration: 1200, delay: 2250, useNativeDriver: false }).start();
-
-    Animated.sequence([
-      Animated.delay(250),
-      Animated.timing(line1Opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.delay(900),
-      Animated.timing(line1Opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-      Animated.delay(300),
-      Animated.timing(line2Opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.delay(900),
-      Animated.timing(line2Opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-    ]).start(() => {
-      router.replace('/(auth)');
-    });
-  }
+    const LINE_MS = 2100; // her satırın ekranda kalma süresi (fade dahil)
+    const timers = [
+      setTimeout(() => setBreathStep(1), 150),
+      setTimeout(() => setBreathStep(2), 150 + LINE_MS),
+      // arka planı ikinci satırla birlikte bordo'dan cream'e ısıt (renk interp -> JS driver)
+      setTimeout(
+        () => Animated.timing(breathWarmth, { toValue: 1, duration: 1400, useNativeDriver: false }).start(),
+        150 + LINE_MS + 200,
+      ),
+      setTimeout(() => router.replace('/(auth)'), 150 + LINE_MS * 2),
+    ];
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, reduceMotion]);
 
   if (phase === 'breath') {
     const bg = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.bordo, colors.cream] });
@@ -130,16 +128,16 @@ export default function ThresholdScreen() {
     const lineColor = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.cream, colors.bordo] });
 
     return (
-      <Animated.View style={[styles.container, { backgroundColor: bg }]}>
+      <Animated.View key="breath" style={[styles.container, { backgroundColor: bg }]}>
         <SafeAreaView style={styles.breathSafe}>
           <Animated.Text style={[styles.wordmark, styles.breathWord, { color: wordColor }]}>arafta.</Animated.Text>
           <View style={styles.breathLineWrap}>
-            <Animated.Text style={[styles.breathLine, { color: lineColor, opacity: line1Opacity }]}>
+            <BreathLine active={breathStep === 1} color={lineColor}>
               Henüz hiçbir şey yerine oturmadı.
-            </Animated.Text>
-            <Animated.Text style={[styles.breathLine, styles.breathLineOverlay, { color: lineColor, opacity: line2Opacity }]}>
+            </BreathLine>
+            <BreathLine active={breathStep === 2} color={lineColor} overlay>
               Burada bunu açıklaman gerekmiyor.
-            </Animated.Text>
+            </BreathLine>
           </View>
         </SafeAreaView>
       </Animated.View>
@@ -147,7 +145,7 @@ export default function ThresholdScreen() {
   }
 
   return (
-    <Animated.View style={[styles.container, { opacity: leave.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
+    <Animated.View key="splash" style={[styles.container, { opacity: leave.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
       <SafeAreaView style={styles.safe}>
         <Animated.View style={{ alignItems: 'center', opacity: wordOpacity, transform: [{ translateY: wordRise }] }}>
           <Text style={styles.wordmark}>arafta.</Text>
@@ -180,6 +178,39 @@ export default function ThresholdScreen() {
         </View>
       </SafeAreaView>
     </Animated.View>
+  );
+}
+
+// Tek satır — mount olur olmaz kendi opacity'sini `active`'e göre yumuşatır.
+// Animasyon yalnızca bu Text ekrandayken çalıştığı için "görünmeden geçme" olmaz.
+function BreathLine({
+  active,
+  color,
+  overlay = false,
+  children,
+}: {
+  active: boolean;
+  color: Animated.AnimatedInterpolation<string | number>;
+  overlay?: boolean;
+  children: string;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // useNativeDriver: false — aynı <Animated.Text> üstünde `color` (breathWarmth
+    // renk interpolasyonu, JS driver) da animasyonlu; opacity'yi native'e taşırsak
+    // "node has been moved to native" hatası çıkıyor. İkisi de JS driver olmalı.
+    Animated.timing(opacity, {
+      toValue: active ? 1 : 0,
+      duration: active ? 600 : 400,
+      useNativeDriver: false,
+    }).start();
+  }, [active, opacity]);
+
+  return (
+    <Animated.Text style={[styles.breathLine, overlay && styles.breathLineOverlay, { color, opacity }]}>
+      {children}
+    </Animated.Text>
   );
 }
 

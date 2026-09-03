@@ -1,18 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { editorial, editorialRadii } from '../../lib/theme';
-import {
-  INTEREST_OPTIONS,
-  LINK_TYPES,
-  QUESTION_PROMPTS,
-  STATUS_OPTIONS,
-  slugifyUsername,
-  type ProfileLinks,
-  type ProfileQuestion,
-} from '../../lib/types';
+import { INTEREST_OPTIONS, STATUS_OPTIONS, slugifyUsername } from '../../lib/types';
 import { checkUsernameAvailable, useProfile, useUpdateProfile } from '../../hooks/useProfile';
 import { useSession } from '../../providers/SessionProvider';
 import { AvatarPicker } from '../../components/editorial/AvatarPicker';
@@ -20,9 +12,9 @@ import { Field } from '../../components/editorial/Field';
 import { RowButton } from '../../components/editorial/RowButton';
 import { Sheet } from '../../components/editorial/Sheet';
 import { PrimaryButton } from '../../components/editorial/PrimaryButton';
-import { ArrowLeftIcon, CheckIcon, PlusIcon } from '../../components/icons';
+import { ArrowLeftIcon, CheckIcon } from '../../components/icons';
 
-type SheetName = 'status' | 'interests' | 'questions' | 'links' | null;
+type SheetName = 'status' | 'interests' | null;
 
 export default function ProfileEditScreen() {
   const { userId } = useSession();
@@ -103,8 +95,6 @@ export default function ProfileEditScreen() {
 
   const statusSummary = profile.currentStatus.length ? profile.currentStatus.join(' · ') : 'Ekli değil';
   const interestsSummary = profile.interests.length ? profile.interests.join(', ') : 'Ekli değil';
-  const questionsSummary = profile.questions.length ? `${profile.questions.length} soru cevaplandı` : 'Ekli değil';
-  const linksSummary = Object.keys(profile.links).length ? `${Object.keys(profile.links).length} bağlantı` : 'Ekli değil';
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -150,28 +140,14 @@ export default function ProfileEditScreen() {
           />
         </View>
 
-        <View style={styles.section}>
-          <RowButton label="Şu sıralar" value={statusSummary} onPress={() => setOpenSheet('status')} />
-          <RowButton label="İlgi alanlarım" value={interestsSummary} onPress={() => setOpenSheet('interests')} />
-          <RowButton label="Profil soruları" value={questionsSummary} onPress={() => setOpenSheet('questions')} />
-          <RowButton label="Bağlantılar" value={linksSummary} onPress={() => setOpenSheet('links')} last />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>GİZLİLİK</Text>
-          <RowButton label="Engellenen kullanıcılar" onPress={() => router.push('/settings/blocked-users')} last />
-        </View>
-
         <View style={[styles.section, { borderBottomWidth: 0 }]}>
-          <Text style={styles.sectionLabel}>HESAP</Text>
-          <RowButton label="E-posta, şifre ve hesap" onPress={() => router.push('/settings/account-info')} last />
+          <RowButton label="Şu sıralar" value={statusSummary} onPress={() => setOpenSheet('status')} />
+          <RowButton label="İlgi alanlarım" value={interestsSummary} onPress={() => setOpenSheet('interests')} last />
         </View>
       </View>
 
       <StatusSheet visible={openSheet === 'status'} onClose={() => setOpenSheet(null)} initial={profile.currentStatus} onSave={(v) => save({ currentStatus: v })} />
       <InterestsSheet visible={openSheet === 'interests'} onClose={() => setOpenSheet(null)} initial={profile.interests} onSave={(v) => save({ interests: v })} />
-      <QuestionsSheet visible={openSheet === 'questions'} onClose={() => setOpenSheet(null)} initial={profile.questions} onSave={(v) => save({ questions: v })} />
-      <LinksSheet visible={openSheet === 'links'} onClose={() => setOpenSheet(null)} initial={profile.links} onSave={(v) => save({ links: v })} />
     </SafeAreaView>
   );
 }
@@ -277,161 +253,6 @@ function InterestsSheet({
   );
 }
 
-// ---------------------------------------------------------------------------
-function QuestionsSheet({
-  visible,
-  onClose,
-  initial,
-  onSave,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  initial: ProfileQuestion[];
-  onSave: (v: ProfileQuestion[]) => void;
-}) {
-  const [questions, setQuestions] = useState<ProfileQuestion[]>(initial);
-  const [draftPrompt, setDraftPrompt] = useState<string | null>(null);
-  const [draftAnswer, setDraftAnswer] = useState('');
-
-  useEffect(() => {
-    if (visible) {
-      setQuestions(initial);
-      setDraftPrompt(null);
-      setDraftAnswer('');
-    }
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function commitAndClose(next: ProfileQuestion[]) {
-    setQuestions(next);
-    onSave(next);
-  }
-
-  const remaining = QUESTION_PROMPTS.filter((p) => !questions.some((q) => q.q === p));
-
-  if (draftPrompt) {
-    return (
-      <Sheet
-        visible={visible}
-        onClose={onClose}
-        title="Cevapla"
-        footer={
-          <PrimaryButton
-            label="Ekle"
-            disabled={!draftAnswer.trim()}
-            onPress={() => {
-              const next = [...questions, { q: draftPrompt, a: draftAnswer.trim() }];
-              setDraftPrompt(null);
-              setDraftAnswer('');
-              commitAndClose(next);
-            }}
-          />
-        }
-      >
-        <Text style={styles.qPrompt}>{draftPrompt}</Text>
-        <Field label="" placeholder="Kısaca yaz..." multiline value={draftAnswer} onChangeText={setDraftAnswer} style={{ minHeight: 60 }} />
-      </Sheet>
-    );
-  }
-
-  return (
-    <Sheet visible={visible} onClose={onClose} title="Profil soruları" footer={<PrimaryButton label="Bitti" onPress={onClose} />}>
-      {questions.map((q, idx) => (
-        <View key={idx} style={styles.qaItem}>
-          <Text style={styles.qaQ}>{q.q}</Text>
-          <Text style={styles.qaA}>&quot;{q.a}&quot;</Text>
-          <Text
-            style={styles.removeLink}
-            onPress={() => {
-              const next = questions.filter((_, i) => i !== idx);
-              commitAndClose(next);
-            }}
-          >
-            Kaldır
-          </Text>
-        </View>
-      ))}
-      {remaining.map((p) => (
-        <Pressable key={p} style={styles.qPromptRow} onPress={() => setDraftPrompt(p)}>
-          <Text style={styles.qPromptRowText}>{p}</Text>
-          <PlusIcon size={13} color={editorial.burgundy} />
-        </Pressable>
-      ))}
-      {remaining.length === 0 && questions.length === 0 ? <Text style={styles.emptyNote}>Henüz soru yok.</Text> : null}
-    </Sheet>
-  );
-}
-
-// ---------------------------------------------------------------------------
-function LinksSheet({
-  visible,
-  onClose,
-  initial,
-  onSave,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  initial: ProfileLinks;
-  onSave: (v: ProfileLinks) => void;
-}) {
-  const [links, setLinks] = useState<ProfileLinks>(initial);
-  const [editingKey, setEditingKey] = useState<keyof ProfileLinks | null>(null);
-  const [draft, setDraft] = useState('');
-
-  useEffect(() => {
-    if (visible) {
-      setLinks(initial);
-      setEditingKey(null);
-    }
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function startEdit(key: keyof ProfileLinks) {
-    setEditingKey(key);
-    setDraft(links[key] ?? '');
-  }
-
-  function commitEdit() {
-    if (!editingKey) return;
-    const next = { ...links };
-    const cleaned = draft.trim().replace(/^@/, '');
-    if (cleaned) next[editingKey] = cleaned;
-    else delete next[editingKey];
-    setLinks(next);
-    setEditingKey(null);
-    onSave(next);
-  }
-
-  return (
-    <Sheet visible={visible} onClose={onClose} title="Bağlantılar" footer={<PrimaryButton label="Bitti" onPress={onClose} />}>
-      {LINK_TYPES.map(({ key, name }) => (
-        <View key={key} style={styles.linkRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.linkName}>{name}</Text>
-            {editingKey === key ? (
-              <TextInput
-                autoFocus
-                value={draft}
-                onChangeText={setDraft}
-                onBlur={commitEdit}
-                onSubmitEditing={commitEdit}
-                placeholder="kullaniciadi"
-                placeholderTextColor={editorial.inkFaint}
-                style={styles.linkInput}
-              />
-            ) : (
-              <Text style={styles.linkValue}>{links[key] ? `@${links[key]}` : 'Bağlı değil'}</Text>
-            )}
-          </View>
-          {editingKey !== key ? (
-            <Text style={styles.linkAction} onPress={() => startEdit(key)}>
-              {links[key] ? 'Düzenle' : 'Bağlantı ekle'}
-            </Text>
-          ) : null}
-        </View>
-      ))}
-    </Sheet>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -474,14 +295,6 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderBottomWidth: 1,
     borderBottomColor: editorial.line,
-  },
-  sectionLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: editorial.burgundy,
-    marginBottom: 6,
   },
 
   statusOption: {
@@ -539,89 +352,5 @@ const styles = StyleSheet.create({
   },
   interestChipLabelOn: {
     color: editorial.cream,
-  },
-
-  qaItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: editorial.line,
-  },
-  qaQ: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: editorial.inkSoft,
-    marginBottom: 4,
-  },
-  qaA: {
-    fontFamily: 'Fraunces_500Medium_Italic',
-    fontSize: 15,
-    color: editorial.ink,
-    marginBottom: 6,
-  },
-  removeLink: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: editorial.error,
-  },
-  qPrompt: {
-    fontFamily: 'Fraunces_500Medium_Italic',
-    fontSize: 16,
-    color: editorial.ink,
-    marginBottom: 14,
-  },
-  qPromptRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: editorial.line,
-  },
-  qPromptRowText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    color: editorial.ink,
-    flex: 1,
-    marginRight: 8,
-  },
-  emptyNote: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: editorial.inkSoft,
-    paddingVertical: 10,
-  },
-
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: editorial.line,
-  },
-  linkName: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    color: editorial.ink,
-  },
-  linkValue: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12.5,
-    color: editorial.inkFaint,
-    marginTop: 2,
-  },
-  linkInput: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    color: editorial.ink,
-    borderBottomWidth: 1,
-    borderBottomColor: editorial.burgundy,
-    paddingVertical: 2,
-    marginTop: 2,
-  },
-  linkAction: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12.5,
-    color: editorial.burgundy,
   },
 });

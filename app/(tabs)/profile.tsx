@@ -7,16 +7,6 @@ import type { Profile } from '../../lib/types';
 import { useProfile } from '../../hooks/useProfile';
 import { GearIcon, LocationPinIcon, MoreIcon, PersonIcon } from '../../components/icons';
 
-function completion(p: Profile): number {
-  let n = 0;
-  if (p.username) n++;
-  if (p.avatarUrl) n++;
-  if (p.bio) n++;
-  if (p.currentStatus.length) n++;
-  if (p.interests.length) n++;
-  return Math.round((n / 5) * 100);
-}
-
 function initials(p: Profile): string {
   const src = p.displayName || p.username || '';
   return src ? src.charAt(0).toLocaleUpperCase('tr-TR') : '';
@@ -53,19 +43,10 @@ function Avatar({ profile, size }: { profile: Profile; size: number }) {
   );
 }
 
-function EditButton() {
-  return (
-    <Text style={styles.editBtn} onPress={() => router.push('/profile/edit')}>
-      Profili düzenle
-    </Text>
-  );
-}
-
 function FullProfile({ profile }: { profile: Profile }) {
   const statusAll = profile.currentStatus;
   const statusHead = statusAll[0];
   const statusExtra = statusAll.length - 1;
-  const pct = completion(profile);
 
   return (
     <View>
@@ -86,31 +67,16 @@ function FullProfile({ profile }: { profile: Profile }) {
         </Pressable>
       </View>
 
-      {pct < 100 ? (
-        <View style={styles.progressWrap}>
-          <View style={styles.progressLabelRow}>
-            <Text style={styles.progressLabel}>Profilin</Text>
-            <Text style={styles.progressLabel}>%{pct}</Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${pct}%` }]} />
-          </View>
-        </View>
-      ) : null}
-
       {profile.bio ? (
         <Text style={styles.bio}>&quot;{profile.bio}&quot;</Text>
       ) : (
         <View style={styles.emptyRow}>
           <Text style={styles.emptyCaption}>Henüz kendinden bahsetmedin.</Text>
-          <Text style={styles.emptyPrompt}>&quot;Şu sıralar hayatında neler oluyor?&quot;</Text>
           <Text style={styles.emptyAdd} onPress={() => router.push('/profile/edit')}>
             + Bio ekle
           </Text>
         </View>
       )}
-
-      <EditButton />
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>ŞU SIRALAR</Text>
@@ -149,24 +115,6 @@ function FullProfile({ profile }: { profile: Profile }) {
         )}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>PROFİL SORULARI</Text>
-        {profile.questions.length ? (
-          profile.questions.map((q, idx) => (
-            <View key={idx} style={[styles.qaItem, idx === profile.questions.length - 1 && { borderBottomWidth: 0 }]}>
-              <Text style={styles.qaQ}>{q.q}</Text>
-              <Text style={styles.qaA}>&quot;{q.a}&quot;</Text>
-            </View>
-          ))
-        ) : (
-          <View style={styles.emptyRowTight}>
-            <Text style={styles.emptyPrompt}>İstersen biraz daha kendinden bahsedebilirsin.</Text>
-            <Text style={styles.emptyAdd} onPress={() => router.push('/profile/edit')}>
-              + Bir soru cevapla
-            </Text>
-          </View>
-        )}
-      </View>
     </View>
   );
 }
@@ -211,31 +159,6 @@ const styles = StyleSheet.create({
     color: editorial.inkFaint,
   },
 
-  progressWrap: {
-    width: '100%',
-    marginBottom: 20,
-  },
-  progressLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 7,
-  },
-  progressLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: editorial.inkSoft,
-  },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: editorial.beige,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: editorial.burgundy,
-    borderRadius: 2,
-  },
   // full profile
   head: {
     flexDirection: 'row',
@@ -276,19 +199,6 @@ const styles = StyleSheet.create({
     color: editorial.ink,
     marginBottom: 24,
   },
-  editBtn: {
-    minHeight: 46,
-    lineHeight: 46,
-    textAlign: 'center',
-    borderWidth: 1.5,
-    borderColor: editorial.burgundy,
-    color: editorial.burgundy,
-    borderRadius: editorialRadii.btn,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 14.5,
-    marginBottom: 26,
-    overflow: 'hidden',
-  },
   section: {
     marginBottom: 24,
   },
@@ -326,23 +236,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
     color: editorial.ink,
-  },
-  qaItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: editorial.line,
-  },
-  qaQ: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: editorial.inkSoft,
-    marginBottom: 4,
-  },
-  qaA: {
-    fontFamily: 'Fraunces_500Medium_Italic',
-    fontSize: 15,
-    color: editorial.ink,
-    lineHeight: 22,
   },
   emptyRow: {
     paddingVertical: 14,

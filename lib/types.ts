@@ -51,13 +51,6 @@ export function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
 }
 
-export type ProfileQuestion = {
-  q: string;
-  a: string;
-};
-
-export type ProfileLinks = Partial<Record<'instagram' | 'spotify' | 'letterboxd' | 'goodreads', string>>;
-
 export type NotificationPrefs = {
   postLike: boolean;
   postComment: boolean;
@@ -94,8 +87,6 @@ export type Profile = {
   bio: string | null;
   currentStatus: string[];
   interests: string[];
-  questions: ProfileQuestion[];
-  links: ProfileLinks;
   location: string | null;
   phone: string | null;
   birthdate: string | null;
@@ -137,21 +128,6 @@ export const INTEREST_OPTIONS = [
   'Yemek',
   'Kişisel gelişim',
 ] as const;
-
-export const QUESTION_PROMPTS = [
-  'Son zamanlarda seni ne heyecanlandırıyor?',
-  'Bir gün tamamen boş olsa ne yapardın?',
-  'Şu an hayatında neyi çözmeye çalışıyorsun?',
-  'Kimseye söylemediğin bir hedefin var mı?',
-  'En çok hangi konuda kendini yalnız hissediyorsun?',
-] as const;
-
-export const LINK_TYPES: { key: keyof ProfileLinks; name: string }[] = [
-  { key: 'instagram', name: 'Instagram' },
-  { key: 'spotify', name: 'Spotify' },
-  { key: 'letterboxd', name: 'Letterboxd' },
-  { key: 'goodreads', name: 'Goodreads' },
-];
 
 export const REPORT_REASONS = [
   'Spam',

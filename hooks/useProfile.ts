@@ -7,8 +7,6 @@ import {
   type ContentPrefs,
   type NotificationPrefs,
   type Profile,
-  type ProfileLinks,
-  type ProfileQuestion,
 } from '../lib/types';
 import { useSession } from './useSession';
 
@@ -20,8 +18,6 @@ const PROFILE_COLUMNS = [
   'bio',
   'current_status',
   'interests',
-  'profile_questions',
-  'links',
   'location',
   'phone',
   'birthdate',
@@ -37,8 +33,6 @@ type ProfileRow = {
   bio: string | null;
   current_status: string[];
   interests: string[];
-  profile_questions: ProfileQuestion[];
-  links: ProfileLinks;
   location: string | null;
   phone: string | null;
   birthdate: string | null;
@@ -101,8 +95,6 @@ function mapRow(row: ProfileRow): Profile {
     bio: row.bio,
     currentStatus: row.current_status ?? [],
     interests: row.interests ?? [],
-    questions: row.profile_questions ?? [],
-    links: row.links ?? {},
     location: row.location,
     phone: row.phone,
     birthdate: row.birthdate,
@@ -164,8 +156,6 @@ export type ProfilePatch = Partial<{
   bio: string;
   currentStatus: string[];
   interests: string[];
-  questions: ProfileQuestion[];
-  links: ProfileLinks;
   phone: string;
   birthdate: string;
   notificationPrefs: Partial<NotificationPrefs>;
@@ -201,8 +191,6 @@ export function useUpdateProfile() {
           ...(patch.bio !== undefined ? { bio: patch.bio } : {}),
           ...(patch.currentStatus !== undefined ? { current_status: patch.currentStatus } : {}),
           ...(patch.interests !== undefined ? { interests: patch.interests } : {}),
-          ...(patch.questions !== undefined ? { profile_questions: patch.questions } : {}),
-          ...(patch.links !== undefined ? { links: patch.links } : {}),
           ...(patch.phone !== undefined ? { phone: patch.phone } : {}),
           ...(patch.birthdate !== undefined ? { birthdate: patch.birthdate } : {}),
           ...(notificationPatch ? { notification_prefs: notificationPatch } : {}),

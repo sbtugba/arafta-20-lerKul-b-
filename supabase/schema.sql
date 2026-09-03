@@ -48,8 +48,6 @@ alter table public.profiles add column if not exists username text;
 alter table public.profiles add column if not exists avatar_url text;
 alter table public.profiles add column if not exists current_status text[] not null default '{}';
 alter table public.profiles add column if not exists interests text[] not null default '{}';
-alter table public.profiles add column if not exists profile_questions jsonb not null default '[]';
-alter table public.profiles add column if not exists links jsonb not null default '{}';
 alter table public.profiles add column if not exists location text;
 -- Görünürlük bayrakları (profile_visible, location_visible, show_age, show_interests,
 -- show_active, show_last_seen) kaldırıldı: başkasının profilini görüntüleyecek bir
