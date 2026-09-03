@@ -85,7 +85,7 @@ export default function DiscoverScreen() {
         ) : (
           <>
             <View style={styles.section}>
-              <SectionHeading title="Bugünün nabzı" />
+              <SectionHeading title="Bugünün Nabzı" />
               {topicsLoading ? (
                 <Text style={styles.loading}>Yükleniyor…</Text>
               ) : todayTopics.length === 0 ? (
