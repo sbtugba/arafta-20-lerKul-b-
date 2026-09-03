@@ -11,22 +11,6 @@ Uygulamanın tamamı bilinçli olarak **kişi değil konu takibi** üzerine kuru
 grafiği, "önerilen kişiler", başkasının profilini gezme gibi sosyal ağ mekanikleri yok.
 İnsanlar hashtag takip eder, birbirini değil.
 
----
-
-## Ekran görüntüleri
-
-> _Buraya eklenecek — `docs/screenshots/` altına koyup aşağıdaki bağlantıları güncelle._
-
-| Eşik / Onboarding | Akış | Keşfet |
-|---|---|---|
-| ![](docs/screenshots/threshold.png) | ![](docs/screenshots/feed.png) | ![](docs/screenshots/discover.png) |
-
-| Gönderi + yorumlar | Profil | Ayarlar |
-|---|---|---|
-| ![](docs/screenshots/post.png) | ![](docs/screenshots/profile.png) | ![](docs/screenshots/settings.png) |
-
----
-
 ## Özellikler
 
 - **Kimlik doğrulama** — e-posta + şifre, kayıtta kullanıcı adı (debounce'lu müsaitlik
