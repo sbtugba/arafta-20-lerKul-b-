@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { editorial, editorialRadii } from '../../lib/theme';
 import type { Profile } from '../../lib/types';
 import { useProfile } from '../../hooks/useProfile';
-import { CheckIcon, GearIcon, LocationPinIcon, MoreIcon, PersonIcon } from '../../components/icons';
+import { GearIcon, LocationPinIcon, MoreIcon, PersonIcon } from '../../components/icons';
 
 function completion(p: Profile): number {
   let n = 0;
@@ -15,10 +15,6 @@ function completion(p: Profile): number {
   if (p.currentStatus.length) n++;
   if (p.interests.length) n++;
   return Math.round((n / 5) * 100);
-}
-
-function isTouched(p: Profile): boolean {
-  return !!(p.bio || p.avatarUrl || p.interests.length || p.questions.length || p.currentStatus.length);
 }
 
 function initials(p: Profile): string {
@@ -37,9 +33,7 @@ export default function ProfileScreen() {
           <GearIcon size={17} color={editorial.burgundy} />
         </Pressable>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        {!isLoading && profile ? (isTouched(profile) ? <FullProfile profile={profile} /> : <Nudge profile={profile} />) : null}
-      </ScrollView>
+      <ScrollView contentContainerStyle={styles.content}>{!isLoading && profile ? <FullProfile profile={profile} /> : null}</ScrollView>
     </SafeAreaView>
   );
 }
@@ -59,49 +53,6 @@ function Avatar({ profile, size }: { profile: Profile; size: number }) {
   );
 }
 
-function Nudge({ profile }: { profile: Profile }) {
-  const pct = completion(profile);
-  const checks: [string, boolean][] = [
-    ['Kullanıcı adı', !!profile.username],
-    ['Profil fotoğrafı', !!profile.avatarUrl],
-    ['Hakkında', !!profile.bio],
-    ['İlgi alanları', profile.interests.length > 0],
-    ['Şu sıralar', profile.currentStatus.length > 0],
-  ];
-
-  return (
-    <View style={styles.nudge}>
-      <Avatar profile={profile} size={84} />
-      <Text style={styles.nudgeUsername}>@{profile.username || 'kullaniciadi'}</Text>
-      <Text style={styles.nudgeHeadline}>Profilini biraz daha sen yap.</Text>
-      <Text style={styles.nudgeSub}>
-        İnsanların seni daha iyi tanıması için profiline birkaç şey ekleyebilirsin — istediğin zaman, istediğin kadar.
-      </Text>
-
-      <View style={styles.progressWrap}>
-        <View style={styles.progressLabelRow}>
-          <Text style={styles.progressLabel}>Profilin</Text>
-          <Text style={styles.progressLabel}>%{pct}</Text>
-        </View>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${pct}%` }]} />
-        </View>
-      </View>
-
-      <EditButton />
-
-      <View style={styles.checklist}>
-        {checks.map(([label, done]) => (
-          <View key={label} style={styles.checkItem}>
-            <View style={[styles.checkDot, done && styles.checkDotDone]}>{done ? <CheckIcon size={10} color={editorial.cream} /> : null}</View>
-            <Text style={[styles.checkLabel, done && styles.checkLabelDone]}>{label}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 function EditButton() {
   return (
     <Text style={styles.editBtn} onPress={() => router.push('/profile/edit')}>
@@ -114,6 +65,7 @@ function FullProfile({ profile }: { profile: Profile }) {
   const statusAll = profile.currentStatus;
   const statusHead = statusAll[0];
   const statusExtra = statusAll.length - 1;
+  const pct = completion(profile);
 
   return (
     <View>
@@ -122,7 +74,7 @@ function FullProfile({ profile }: { profile: Profile }) {
         <View style={{ flex: 1, paddingTop: 2 }}>
           <Text style={styles.name}>{profile.displayName || profile.username || 'sen'}</Text>
           <Text style={styles.username}>@{profile.username || 'kullaniciadi'}</Text>
-          {profile.locationVisible && profile.location ? (
+          {profile.location ? (
             <View style={styles.locationRow}>
               <LocationPinIcon size={11} color={editorial.inkFaint} />
               <Text style={styles.locationText}>{profile.location}</Text>
@@ -133,6 +85,18 @@ function FullProfile({ profile }: { profile: Profile }) {
           <MoreIcon size={18} color={editorial.inkSoft} />
         </Pressable>
       </View>
+
+      {pct < 100 ? (
+        <View style={styles.progressWrap}>
+          <View style={styles.progressLabelRow}>
+            <Text style={styles.progressLabel}>Profilin</Text>
+            <Text style={styles.progressLabel}>%{pct}</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${pct}%` }]} />
+          </View>
+        </View>
+      ) : null}
 
       {profile.bio ? (
         <Text style={styles.bio}>&quot;{profile.bio}&quot;</Text>
@@ -148,15 +112,22 @@ function FullProfile({ profile }: { profile: Profile }) {
 
       <EditButton />
 
-      {statusHead ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>ŞU SIRALAR</Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>ŞU SIRALAR</Text>
+        {statusHead ? (
           <Text style={styles.statusLine}>
             {statusHead}
             {statusExtra > 0 ? <Text style={styles.statusExtra}> +{statusExtra}</Text> : null}
           </Text>
-        </View>
-      ) : null}
+        ) : (
+          <View style={styles.emptyRowTight}>
+            <Text style={styles.emptyPrompt}>Şu sıralar neler oluyor, hiç yazmadın.</Text>
+            <Text style={styles.emptyAdd} onPress={() => router.push('/profile/edit')}>
+              + Şu sıralar ekle
+            </Text>
+          </View>
+        )}
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>İLGİ ALANLARIM</Text>
@@ -240,33 +211,6 @@ const styles = StyleSheet.create({
     color: editorial.inkFaint,
   },
 
-  // nudge
-  nudge: {
-    alignItems: 'center',
-    paddingTop: 24,
-  },
-  nudgeUsername: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13.5,
-    color: editorial.inkSoft,
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  nudgeHeadline: {
-    fontFamily: 'Fraunces_500Medium_Italic',
-    fontSize: 22,
-    color: editorial.ink,
-    marginBottom: 8,
-  },
-  nudgeSub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13.5,
-    lineHeight: 20,
-    color: editorial.inkSoft,
-    textAlign: 'center',
-    maxWidth: 260,
-    marginBottom: 22,
-  },
   progressWrap: {
     width: '100%',
     marginBottom: 20,
@@ -292,38 +236,6 @@ const styles = StyleSheet.create({
     backgroundColor: editorial.burgundy,
     borderRadius: 2,
   },
-  checklist: {
-    width: '100%',
-    marginTop: 18,
-    gap: 9,
-  },
-  checkItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  checkDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: editorial.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkDotDone: {
-    backgroundColor: editorial.burgundy,
-    borderColor: editorial.burgundy,
-  },
-  checkLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13.5,
-    color: editorial.inkFaint,
-  },
-  checkLabelDone: {
-    color: editorial.ink,
-  },
-
   // full profile
   head: {
     flexDirection: 'row',

@@ -7,36 +7,42 @@ import { colors, type } from '../../lib/theme';
 import { usePost, useToggleReaction } from '../../hooks/usePosts';
 import { useComments, useCreateComment, useDeleteComment, useToggleCommentLike } from '../../hooks/useComments';
 import { useSubmitCommentReport, useSubmitReport } from '../../hooks/useReports';
-import { REPORT_REASONS, type Comment, type Post } from '../../lib/types';
+import { useBlockUser } from '../../hooks/useBlockedUsers';
+import { useSession } from '../../hooks/useSession';
+import { REPORT_REASONS, displayNameFor, relativeTime, type Comment, type Post } from '../../lib/types';
 import { ArrowLeftIcon, HeartIcon, MoreIcon, ShareIcon, TalkIcon } from '../../components/icons';
+import { Avatar } from '../../components/Avatar';
+import { AuthorName } from '../../components/AuthorName';
 import { Sheet } from '../../components/editorial/Sheet';
 import { ConfirmDialog } from '../../components/editorial/ConfirmDialog';
 
-function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return 'şimdi';
-  if (minutes < 60) return `${minutes} dk önce`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} sa önce`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} gün önce`;
-  return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+// Ortak engelleme onayı — hem gönderi hem yorum menüsünden çağrılıyor.
+function askBlock(label: string, onConfirm: () => void) {
+  Alert.alert(
+    `${label} engellensin mi?`,
+    'Bu kişinin paylaşımlarını ve yorumlarını artık görmeyeceksin. İstediğin zaman Ayarlar > Engellenenler ekranından geri alabilirsin.',
+    [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Engelle', style: 'destructive', onPress: onConfirm },
+    ]
+  );
 }
 
 function PostHeader({ post, onToggleReaction }: { post: Post; onToggleReaction: () => void }) {
-  const [reportOpen, setReportOpen] = useState(false);
+  const [menu, setMenu] = useState<'closed' | 'actions' | 'report'>('closed');
   const submitReport = useSubmitReport();
+  const blockUser = useBlockUser();
+  const { userId } = useSession();
 
-  const name = post.isAnonymous ? 'anonim' : (post.authorDisplayName ?? 'biri');
-  const initial = name.charAt(0).toLocaleUpperCase('tr-TR');
+  const name = post.isAnonymous ? 'anonim' : displayNameFor(post.authorDisplayName, post.authorUsername);
+  const canBlock = !post.isAnonymous && !!post.authorId && post.authorId !== userId;
 
   function handleReport(reason: string) {
     submitReport.mutate(
       { postId: post.id, reason },
       {
         onSuccess: () => {
-          setReportOpen(false);
+          setMenu('closed');
           Alert.alert('Bildirildi', 'Bu paylaşımı bildirdiğin için teşekkürler, ekibimiz inceleyecek.');
         },
         onError: () => Alert.alert('Bir şeyler ters gitti', 'Bildirimi gönderemedik, lütfen tekrar dene.'),
@@ -44,19 +50,34 @@ function PostHeader({ post, onToggleReaction }: { post: Post; onToggleReaction: 
     );
   }
 
+  function onBlock() {
+    askBlock(name, () =>
+      blockUser.mutate(post.authorId, {
+        onSuccess: () => {
+          setMenu('closed');
+          Alert.alert('Engellendi', `${name} artık akışında görünmeyecek.`);
+          router.back();
+        },
+        onError: () => Alert.alert('Bir şeyler ters gitti', 'Engelleyemedik, lütfen tekrar dene.'),
+      })
+    );
+  }
+
   return (
     <View style={styles.postBlock}>
       <View style={styles.postTopRow}>
         <View style={styles.commentWho}>
-          <View style={styles.avatarLg}>
-            <Text style={styles.avatarLgLabel}>{initial}</Text>
-          </View>
+          <Avatar isAnonymous={post.isAnonymous} avatarUrl={post.authorAvatarUrl} name={name} size={40} />
           <View>
-            <Text style={styles.postName}>{name}</Text>
+            {post.isAnonymous ? (
+              <Text style={styles.postName}>anonim</Text>
+            ) : (
+              <AuthorName displayName={post.authorDisplayName} username={post.authorUsername} nameStyle={styles.postName} />
+            )}
             <Text style={styles.commentTime}>{relativeTime(post.createdAt)}</Text>
           </View>
         </View>
-        <Pressable hitSlop={10} style={styles.moreBtn} onPress={() => setReportOpen(true)} accessibilityLabel="Gönderi seçenekleri">
+        <Pressable hitSlop={10} style={styles.moreBtn} onPress={() => setMenu('actions')} accessibilityLabel="Gönderi seçenekleri">
           <MoreIcon size={16} color={colors.bordoMuted} />
         </Pressable>
       </View>
@@ -78,7 +99,18 @@ function PostHeader({ post, onToggleReaction }: { post: Post; onToggleReaction: 
         </Pressable>
       </View>
 
-      <Sheet visible={reportOpen} onClose={() => setReportOpen(false)} title="Bu gönderiyi bildir">
+      <Sheet visible={menu === 'actions'} onClose={() => setMenu('closed')} title="Gönderi seçenekleri">
+        {canBlock ? (
+          <Pressable style={styles.sheetRow} onPress={onBlock} disabled={blockUser.isPending}>
+            <Text style={styles.sheetRowBordo}>Bu kişiyi engelle</Text>
+          </Pressable>
+        ) : null}
+        <Pressable style={styles.sheetRow} onPress={() => setMenu('report')}>
+          <Text style={styles.sheetRowLabel}>Şikayet et</Text>
+        </Pressable>
+      </Sheet>
+
+      <Sheet visible={menu === 'report'} onClose={() => setMenu('closed')} title="Bu gönderiyi bildir">
         {REPORT_REASONS.map((reason) => (
           <Pressable key={reason} style={styles.sheetRow} onPress={() => handleReport(reason)} disabled={submitReport.isPending}>
             <Text style={styles.sheetRowDanger}>{reason}</Text>
@@ -105,13 +137,15 @@ function CommentSkeleton() {
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: post, isLoading: postLoading } = usePost(id);
-  const { data: comments, isLoading: commentsLoading } = useComments(id);
+  const { data: post, isPending: postLoading } = usePost(id);
+  const { data: comments, isPending: commentsLoading } = useComments(id);
   const toggleReaction = useToggleReaction();
   const toggleCommentLike = useToggleCommentLike(id);
   const createComment = useCreateComment(id);
   const deleteComment = useDeleteComment(id);
   const submitCommentReport = useSubmitCommentReport();
+  const blockUser = useBlockUser();
+  const { userId } = useSession();
 
   const [draft, setDraft] = useState('');
   const [replyTarget, setReplyTarget] = useState<{ id: string; name: string } | null>(null);
@@ -120,7 +154,8 @@ export default function PostDetailScreen() {
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null);
 
   function startReply(comment: Comment) {
-    setReplyTarget({ id: comment.id, name: comment.authorDisplayName ?? 'biri' });
+    const name = comment.isAnonymous ? 'anonim' : displayNameFor(comment.authorDisplayName, comment.authorUsername);
+    setReplyTarget({ id: comment.id, name });
   }
   function cancelReply() {
     setReplyTarget(null);
@@ -167,18 +202,19 @@ export default function PostDetailScreen() {
   }
 
   function renderComment(comment: Comment, isReply: boolean) {
-    const name = comment.isAnonymous ? 'anonim' : (comment.authorDisplayName ?? 'biri');
-    const initial = name.charAt(0).toLocaleUpperCase('tr-TR');
+    const name = comment.isAnonymous ? 'anonim' : displayNameFor(comment.authorDisplayName, comment.authorUsername);
     return (
       <View key={comment.id}>
         <View style={[styles.commentCard, isReply && styles.replyCard]}>
           <View style={styles.commentTop}>
             <View style={styles.commentWho}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarLabel}>{initial}</Text>
-              </View>
+              <Avatar isAnonymous={comment.isAnonymous} avatarUrl={comment.authorAvatarUrl} name={name} size={30} />
               <View>
-                <Text style={styles.commentName}>{name}</Text>
+                {comment.isAnonymous ? (
+                  <Text style={styles.commentName}>anonim</Text>
+                ) : (
+                  <AuthorName displayName={comment.authorDisplayName} username={comment.authorUsername} nameStyle={styles.commentName} />
+                )}
                 <Text style={styles.commentTime}>{relativeTime(comment.createdAt)}</Text>
               </View>
             </View>
@@ -295,15 +331,36 @@ export default function PostDetailScreen() {
             <Text style={styles.sheetRowDanger}>Yorumu sil</Text>
           </Pressable>
         ) : (
-          <Pressable
-            style={styles.sheetRow}
-            onPress={() => {
-              setReportSheetComment(menuComment);
-              setMenuComment(null);
-            }}
-          >
-            <Text style={styles.sheetRowDanger}>Yorumu bildir</Text>
-          </Pressable>
+          <>
+            {menuComment && !menuComment.isAnonymous && menuComment.authorId !== userId ? (
+              <Pressable
+                style={styles.sheetRow}
+                disabled={blockUser.isPending}
+                onPress={() => {
+                  const c = menuComment;
+                  const label = displayNameFor(c.authorDisplayName, c.authorUsername);
+                  setMenuComment(null);
+                  askBlock(label, () =>
+                    blockUser.mutate(c.authorId, {
+                      onSuccess: () => Alert.alert('Engellendi', `${label} artık akışında ve yorumlarda görünmeyecek.`),
+                      onError: () => Alert.alert('Bir şeyler ters gitti', 'Engelleyemedik, lütfen tekrar dene.'),
+                    })
+                  );
+                }}
+              >
+                <Text style={styles.sheetRowBordo}>Bu kişiyi engelle</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              style={styles.sheetRow}
+              onPress={() => {
+                setReportSheetComment(menuComment);
+                setMenuComment(null);
+              }}
+            >
+              <Text style={styles.sheetRowLabel}>Yorumu bildir</Text>
+            </Pressable>
+          </>
         )}
       </Sheet>
 
@@ -369,19 +426,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     marginBottom: 12,
-  },
-  avatarLg: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.goldPale,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarLgLabel: {
-    fontFamily: 'Fraunces_600SemiBold_Italic',
-    fontSize: 16,
-    color: colors.bordo,
   },
   postName: {
     fontFamily: type.bodyBold,
@@ -476,19 +520,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 9,
     flex: 1,
-  },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.goldPale,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarLabel: {
-    fontFamily: 'Fraunces_600SemiBold_Italic',
-    fontSize: 13,
-    color: colors.bordo,
   },
   commentName: {
     fontFamily: type.bodyBold,
@@ -610,5 +641,10 @@ const styles = StyleSheet.create({
     fontFamily: type.bodySemibold,
     fontSize: 14.5,
     color: '#A6432F',
+  },
+  sheetRowBordo: {
+    fontFamily: type.bodySemibold,
+    fontSize: 14.5,
+    color: colors.bordo,
   },
 });

@@ -121,15 +121,15 @@ export default function ProfileEditScreen() {
 
         <View style={styles.section}>
           <Field
-            label="Görünen isim"
-            placeholder="ör. Tuğba"
+            label="İsim"
+            placeholder="Adını Ekle"
             value={displayName}
             onChangeText={setDisplayName}
             onBlur={() => displayName !== (profile.displayName ?? '') && save({ displayName })}
           />
           <Field
             label="Kullanıcı adı"
-            placeholder="kullaniciadi"
+            placeholder="Kullanıcı Adını Ekle"
             autoCapitalize="none"
             value={username}
             onChangeText={onUsernameChange}
@@ -159,7 +159,7 @@ export default function ProfileEditScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>GİZLİLİK</Text>
-          <RowButton label="Görünürlük ve gizlilik ayarları" onPress={() => router.push('/settings/privacy')} last />
+          <RowButton label="Engellenen kullanıcılar" onPress={() => router.push('/settings/blocked-users')} last />
         </View>
 
         <View style={[styles.section, { borderBottomWidth: 0 }]}>

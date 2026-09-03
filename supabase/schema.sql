@@ -1,12 +1,4 @@
--- Arafta: 20'ler Kulübü — Supabase şeması
--- Supabase projenin SQL Editor'ünde bu dosyanın tamamını çalıştır.
--- Uygulama artık gerçek e-posta/şifre hesabı gerektiriyor — "Anonymous Sign-Ins"
--- açık olması gerekmiyor (kapalı da kalabilir; kullanılmıyor).
 
--- ---------------------------------------------------------------------------
--- profiles: "Profilim" modunda görünen kimlik. Anonim paylaşımlar buna dokunmaz —
--- is_anonymous=true bir post'ta bu profildeki hiçbir alan gösterilmez.
--- ---------------------------------------------------------------------------
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text,
@@ -59,8 +51,10 @@ alter table public.profiles add column if not exists interests text[] not null d
 alter table public.profiles add column if not exists profile_questions jsonb not null default '[]';
 alter table public.profiles add column if not exists links jsonb not null default '{}';
 alter table public.profiles add column if not exists location text;
-alter table public.profiles add column if not exists location_visible boolean not null default true;
-alter table public.profiles add column if not exists profile_visible boolean not null default true;
+-- Görünürlük bayrakları (profile_visible, location_visible, show_age, show_interests,
+-- show_active, show_last_seen) kaldırıldı: başkasının profilini görüntüleyecek bir
+-- ekran yok (Arafta kişi değil konu takibi üstüne kurulu), bu yüzden "kime görünür"
+-- ayarlarının karşılığı yoktu. Eski kurulumlarda kolonlar durabilir, kullanılmıyor.
 
 alter table public.profiles drop constraint if exists profiles_bio_length;
 alter table public.profiles add constraint profiles_bio_length check (bio is null or char_length(bio) <= 180);
@@ -77,23 +71,17 @@ create unique index if not exists profiles_username_unique_idx on public.profile
 -- ---------------------------------------------------------------------------
 alter table public.profiles add column if not exists phone text;
 alter table public.profiles add column if not exists birthdate date;
-alter table public.profiles add column if not exists show_age boolean not null default false;
-alter table public.profiles add column if not exists show_interests boolean not null default true;
-alter table public.profiles add column if not exists show_active boolean not null default true;
-alter table public.profiles add column if not exists show_last_seen boolean not null default false;
 -- "Kimler takip edebilir" gibi kişi-takibine dayalı ayarlar bilinçli olarak yok —
 -- Arafta'da henüz bir takipçi grafiği yok (konu takibi üstüne kurulu), UI'da olmayan
--- bir özellik için sahte bir alan tutmadık. profile_visible (herkese açık/kapalı)
--- zaten var olan daha basit mekanizmayı kullanıyor.
+-- bir özellik için sahte bir alan tutmadık.
 
 alter table public.profiles add column if not exists notification_prefs jsonb not null default '{
-  "new_follower": true, "follow_request": true, "post_like": true, "post_comment": true, "mention": true,
-  "new_content": true, "suggested_people": false, "community_events": true,
+  "post_like": true, "post_comment": true, "new_content": true,
   "important_announcements": true, "app_updates": false, "email_product": false
 }'::jsonb;
 
 alter table public.profiles add column if not exists content_prefs jsonb not null default '{
-  "reduce_uninterested": true, "sensitive_content": false, "autoplay": true
+  "reduce_uninterested": true, "sensitive_content": false
 }'::jsonb;
 
 -- ---------------------------------------------------------------------------
@@ -404,9 +392,136 @@ create policy "users can unfollow their own topics"
   using (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------------
+-- weekly_podcast: Akış ve Keşfet ekranlarındaki podcast kartı buradan besleniyor.
+-- Yeni bir bölüm yayınlandığında buraya bir satır eklenir (Supabase Table
+-- Editor'den elle) — kod değişikliği veya app store güncellemesi gerekmez.
+-- Uygulama her zaman en son eklenen satırı gösterir (bkz. hooks/useWeeklyPodcast.ts).
+-- Herkes okuyabilir; yazma app kullanıcılarına açık değil, yalnızca proje
+-- sahibi dashboard üzerinden ekliyor (RLS bu yüzden sadece select policy'si içeriyor).
+-- ---------------------------------------------------------------------------
+create table if not exists public.weekly_podcast (
+  id uuid primary key default gen_random_uuid(),
+  quote text not null,
+  episode_title text not null,
+  spotify_url text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.weekly_podcast enable row level security;
+
+drop policy if exists "weekly podcast is publicly readable" on public.weekly_podcast;
+create policy "weekly podcast is publicly readable"
+  on public.weekly_podcast for select
+  using (true);
+
+-- ---------------------------------------------------------------------------
+-- notifications: gerçek bildirim akışı. user_id null ise herkese yayın
+-- (ör. yeni podcast bölümü), doluysa yalnız o kullanıcıya özel (ör. birinin
+-- paylaşımını beğenmesi). Kullanıcılar kendi satırlarını + tüm yayınları
+-- okuyabilir; ekleme yalnızca aşağıdaki security definer trigger'lar
+-- üzerinden olur, hiçbir kullanıcı doğrudan bildirim ekleyemez/başkasınınkini
+-- göremez.
+-- ---------------------------------------------------------------------------
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users (id) on delete cascade,
+  type text not null check (type in ('post_like', 'post_comment', 'comment_like', 'podcast')),
+  body text not null,
+  post_id uuid references public.posts (id) on delete cascade,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists notifications_user_id_idx on public.notifications (user_id, created_at desc);
+
+alter table public.notifications enable row level security;
+
+drop policy if exists "users can read their own or broadcast notifications" on public.notifications;
+create policy "users can read their own or broadcast notifications"
+  on public.notifications for select
+  using (auth.uid() = user_id or user_id is null);
+
+drop policy if exists "users can mark their own notifications read" on public.notifications;
+create policy "users can mark their own notifications read"
+  on public.notifications for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- "bende de öyle" -> paylaşımın sahibine bildirim (kendine değil)
+create or replace function public.handle_reaction_notification()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_author_id uuid;
+begin
+  select author_id into v_author_id from public.posts where id = new.post_id;
+  if v_author_id is not null and v_author_id <> new.user_id then
+    insert into public.notifications (user_id, type, body, post_id)
+    values (v_author_id, 'post_like', 'Biri paylaşımınla "bende de öyle" dedi.', new.post_id);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_reaction_notify on public.reactions;
+create trigger on_reaction_notify
+  after insert on public.reactions
+  for each row execute function public.handle_reaction_notification();
+
+-- yeni yorum -> paylaşımın sahibine bildirim (kendine değil)
+create or replace function public.handle_comment_notification()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_author_id uuid;
+begin
+  select author_id into v_author_id from public.posts where id = new.post_id;
+  if v_author_id is not null and v_author_id <> new.author_id then
+    insert into public.notifications (user_id, type, body, post_id)
+    values (v_author_id, 'post_comment', 'Paylaşımına yeni bir yorum geldi.', new.post_id);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_comment_notify on public.comments;
+create trigger on_comment_notify
+  after insert on public.comments
+  for each row execute function public.handle_comment_notification();
+
+-- yeni podcast bölümü -> herkese yayın bildirimi (user_id null)
+create or replace function public.handle_podcast_notification()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.notifications (user_id, type, body)
+  values (null, 'podcast', 'Arafta''dan haberler: yeni bölüm seni bekliyor — "' || new.episode_title || '"');
+  return new;
+end;
+$$;
+
+drop trigger if exists on_podcast_notify on public.weekly_podcast;
+create trigger on_podcast_notify
+  after insert on public.weekly_podcast
+  for each row execute function public.handle_podcast_notification();
+
+-- ---------------------------------------------------------------------------
 -- Örnek veri (opsiyonel) — akışın boş görünmemesi için birkaç başlangıç paylaşımı.
 -- author_id gerektirdiğinden, ilk anonim oturumu açtıktan sonra o kullanıcının
 -- auth.uid() değerini bulup aşağıdaki INSERT'leri Supabase SQL Editor'den elle çalıştırabilirsin.
 -- Örnek:
 -- insert into public.posts (author_id, is_anonymous, body, tags)
 -- values ('<uid>', true, '25 yaşındayım ve hâlâ ne olmak istediğimi bilmiyorum. Herkes bir yerlere gidiyor gibi geliyor ama ben aynı yerde duruyorum.', array['kariyer','belirsizlik']);
+--
+-- Yeni haftanın podcast bölümü için (author_id gerekmiyor, herhangi bir zamanda çalıştırılabilir):
+-- insert into public.weekly_podcast (quote, episode_title, spotify_url)
+-- values ('Bu haftanın öne çıkan alıntısı', 'Bölümün başlığı', 'https://open.spotify.com/episode/<episode-id>');

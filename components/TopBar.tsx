@@ -2,12 +2,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { interpolate, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
-import { colors, type } from '../lib/theme';
+import { colors, editorial, type } from '../lib/theme';
+import { useUnreadNotificationCount } from '../hooks/useNotifications';
 import { BellIcon } from './icons';
 
 // §12 — a scroll-edge mask instead of a permanent hard divider: it only
 // appears once content has actually scrolled in behind the bar.
 export function TopBar({ scrollY }: { scrollY?: SharedValue<number> }) {
+  const unreadCount = useUnreadNotificationCount();
   const edgeStyle = useAnimatedStyle(() => ({
     opacity: scrollY ? interpolate(scrollY.value, [0, 24], [0, 1], 'clamp') : 0,
   }));
@@ -17,8 +19,8 @@ export function TopBar({ scrollY }: { scrollY?: SharedValue<number> }) {
       <View style={styles.row}>
         <Text style={styles.wordmark}>arafta.</Text>
         <Pressable style={styles.bell} onPress={() => router.push('/notifications')} hitSlop={8}>
-          <BellIcon size={17} color={colors.bordo} />
-          <View style={styles.dot} />
+          <BellIcon size={17} color={editorial.burgundy} />
+          {unreadCount > 0 ? <View style={styles.dot} /> : null}
         </Pressable>
       </View>
       <Animated.View style={[styles.edge, edgeStyle]} pointerEvents="none" />
@@ -40,11 +42,12 @@ const styles = StyleSheet.create({
     fontSize: 19,
     color: colors.bordo,
   },
+  // Profildeki Ayarlar (dişli) butonuyla birebir aynı: 34x34, editorial.ivory zemin.
   bell: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: colors.creamDim,
+    backgroundColor: editorial.ivory,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -57,7 +60,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.gold,
     borderWidth: 2,
-    borderColor: colors.creamDim,
+    borderColor: editorial.ivory,
   },
   edge: {
     height: 10,

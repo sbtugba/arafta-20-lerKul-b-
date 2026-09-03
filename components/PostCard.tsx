@@ -6,9 +6,13 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, wit
 import { colors, type } from '../lib/theme';
 import { springs } from '../lib/motion';
 import type { Post } from '../lib/types';
-import { REPORT_REASONS } from '../lib/types';
+import { REPORT_REASONS, displayNameFor } from '../lib/types';
 import { useSubmitReport } from '../hooks/useReports';
+import { useBlockUser } from '../hooks/useBlockedUsers';
+import { useSession } from '../hooks/useSession';
 import { HeartIcon, TalkIcon, MoreIcon } from './icons';
+import { Avatar } from './Avatar';
+import { AuthorName } from './AuthorName';
 import { Sheet } from './editorial/Sheet';
 
 export function PostCard({
@@ -23,15 +27,19 @@ export function PostCard({
   const scale = useSharedValue(1);
   const toastOpacity = useSharedValue(0);
   const toastY = useSharedValue(4);
-  const [reportOpen, setReportOpen] = useState(false);
+  const [menu, setMenu] = useState<'closed' | 'actions' | 'report'>('closed');
   const submitReport = useSubmitReport();
+  const blockUser = useBlockUser();
+  const { userId } = useSession();
+
+  const canBlock = !post.isAnonymous && !!post.authorId && post.authorId !== userId;
 
   function handleReport(reason: string) {
     submitReport.mutate(
       { postId: post.id, reason },
       {
         onSuccess: () => {
-          setReportOpen(false);
+          setMenu('closed');
           Alert.alert('Bildirildi', 'Bu paylaşımı bildirdiğin için teşekkürler, ekibimiz inceleyecek.');
         },
         onError: () => {
@@ -40,6 +48,31 @@ export function PostCard({
       }
     );
   }
+
+  function confirmBlock() {
+    const label = displayNameFor(post.authorDisplayName, post.authorUsername);
+    Alert.alert(
+      `${label} engellensin mi?`,
+      'Bu kişinin paylaşımlarını ve yorumlarını artık görmeyeceksin. İstediğin zaman Ayarlar > Engellenenler ekranından geri alabilirsin.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Engelle',
+          style: 'destructive',
+          onPress: () =>
+            blockUser.mutate(post.authorId, {
+              onSuccess: () => {
+                setMenu('closed');
+                Alert.alert('Engellendi', `${label} artık akışında görünmeyecek.`);
+              },
+              onError: () => Alert.alert('Bir şeyler ters gitti', 'Engelleyemedik, lütfen tekrar dene.'),
+            }),
+        },
+      ]
+    );
+  }
+
+  const name = post.isAnonymous ? 'anonim' : displayNameFor(post.authorDisplayName, post.authorUsername);
 
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const toastStyle = useAnimatedStyle(() => ({
@@ -77,22 +110,30 @@ export function PostCard({
   return (
     <View style={styles.card}>
       <View style={styles.bylineRow}>
-        <Text style={styles.byline}>
+        <View style={styles.bylineLeft}>
+          <Avatar isAnonymous={post.isAnonymous} avatarUrl={post.authorAvatarUrl} name={name} size={36} />
           {post.isAnonymous ? (
-            `anonim · ${post.tags.map((t) => `#${t}`).join(' ')}`
+            <Text style={styles.byline}>anonim</Text>
           ) : (
-            <>
-              <Text style={styles.name}>{post.authorDisplayName ?? 'biri'}</Text>
-              {` · #${post.tags[0] ?? 'arafta'}`}
-            </>
+            <AuthorName displayName={post.authorDisplayName} username={post.authorUsername} nameStyle={styles.name} />
           )}
-        </Text>
-        <Pressable onPress={() => setReportOpen(true)} hitSlop={10} style={styles.moreBtn} accessibilityLabel="Paylaşım seçenekleri">
+        </View>
+        <Pressable onPress={() => setMenu('actions')} hitSlop={10} style={styles.moreBtn} accessibilityLabel="Paylaşım seçenekleri">
           <MoreIcon size={16} color={colors.bordoMuted} />
         </Pressable>
       </View>
 
       <Text style={styles.quote}>&quot;{post.body}&quot;</Text>
+
+      {post.tags.length > 0 ? (
+        <View style={styles.tagsRow}>
+          {post.tags.map((t) => (
+            <Pressable key={t} onPress={() => router.push(`/topic/${encodeURIComponent(t)}`)} hitSlop={4}>
+              <Text style={styles.tagLabel}>#{t}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <View style={styles.actions}>
         <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={handlePress} style={styles.reactBtn} hitSlop={8}>
@@ -100,7 +141,6 @@ export function PostCard({
             <Animated.View style={heartStyle}>
               <HeartIcon size={17} color={post.hasReacted ? colors.gold : colors.bordoMuted} filled={post.hasReacted} />
             </Animated.View>
-            <Animated.Text style={[styles.toast, toastStyle]}>Yalnız değilsin.</Animated.Text>
           </View>
           <Text style={[styles.reactLabel, post.hasReacted && { color: colors.bordo }]}>
             bende de öyle · <Text style={styles.count}>{post.reactionCount.toLocaleString('tr-TR')}</Text>
@@ -118,7 +158,18 @@ export function PostCard({
         </Pressable>
       </View>
 
-      <Sheet visible={reportOpen} onClose={() => setReportOpen(false)} title="Bu paylaşımı bildir">
+      <Sheet visible={menu === 'actions'} onClose={() => setMenu('closed')} title="Paylaşım seçenekleri">
+        {canBlock ? (
+          <Pressable style={styles.reasonRow} onPress={confirmBlock} disabled={blockUser.isPending}>
+            <Text style={[styles.reasonLabel, styles.blockLabel]}>Bu kişiyi engelle</Text>
+          </Pressable>
+        ) : null}
+        <Pressable style={styles.reasonRow} onPress={() => setMenu('report')}>
+          <Text style={styles.reasonLabel}>Şikayet et</Text>
+        </Pressable>
+      </Sheet>
+
+      <Sheet visible={menu === 'report'} onClose={() => setMenu('closed')} title="Bu paylaşımı bildir">
         {REPORT_REASONS.map((reason) => (
           <Pressable key={reason} style={styles.reasonRow} onPress={() => handleReport(reason)} disabled={submitReport.isPending}>
             <Text style={styles.reasonLabel}>{reason}</Text>
@@ -137,16 +188,22 @@ const styles = StyleSheet.create({
   },
   bylineRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
+    marginBottom: 10,
+  },
+  bylineLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   byline: {
     flex: 1,
     fontFamily: type.bodyMedium,
     fontSize: 13,
     color: colors.bordoMuted,
-    marginBottom: 10,
   },
   moreBtn: {
     paddingHorizontal: 2,
@@ -162,8 +219,12 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     color: colors.bordoInk,
   },
+  blockLabel: {
+    color: colors.bordo,
+  },
   name: {
     fontFamily: type.bodyBold,
+    fontSize: 13,
     color: colors.bordo,
   },
   quote: {
@@ -171,7 +232,18 @@ const styles = StyleSheet.create({
     fontSize: 16.5,
     lineHeight: 24,
     color: colors.bordoInk,
+    marginBottom: 10,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
     marginBottom: 14,
+  },
+  tagLabel: {
+    fontFamily: type.bodySemibold,
+    fontSize: 12.5,
+    color: colors.gold,
   },
   actions: {
     flexDirection: 'row',

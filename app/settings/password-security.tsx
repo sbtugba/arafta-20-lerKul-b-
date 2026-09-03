@@ -26,9 +26,7 @@ export default function PasswordSecurityScreen() {
           ) : (
             <RowButton label="Şifremi değiştir" onPress={() => setChanging(true)} />
           )}
-          <RowButton label="E-posta doğrulaması" value="Doğrulandı" onPress={() => {}} />
-          <RowButton label="Telefon doğrulaması" soon onPress={() => {}} />
-          <RowButton label="İki aşamalı doğrulama" soon onPress={() => {}} last />
+          <RowButton label="E-posta doğrulaması" value="Doğrulandı" onPress={() => {}} last />
         </SettingsSection>
 
         <SettingsSection label="AKTİF OTURUMLAR" sub="Şu an yalnızca bu cihazı gösterebiliyoruz — diğer cihazların listesi yakında." last>

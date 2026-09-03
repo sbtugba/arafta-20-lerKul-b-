@@ -11,7 +11,7 @@ type SessionState = {
   session: Session | null;
   userId: string | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<SignUpResult>;
+  signUp: (email: string, password: string, birthdate?: string, username?: string) => Promise<SignUpResult>;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 };
@@ -56,8 +56,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string): Promise<SignUpResult> => {
-    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+  const signUp = useCallback(async (email: string, password: string, birthdate?: string, username?: string): Promise<SignUpResult> => {
+    const metadata = { ...(birthdate ? { birthdate } : {}), ...(username ? { username } : {}) };
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      // Kayıt anında henüz oturum/JWT yok, profiles tablosuna yazamayız — doğum
+      // tarihi ve kullanıcı adını auth metadata'sına koyup ilk profil
+      // oluşturulurken oradan okuyoruz (bkz. hooks/useProfile.ts -> fetchOrCreateProfile).
+      options: Object.keys(metadata).length ? { data: metadata } : undefined,
+    });
     if (error) return { error: translateAuthError(error.message), needsEmailConfirmation: false };
     // Confirm-email is on for this project when signUp succeeds but returns no session yet.
     return { error: null, needsEmailConfirmation: !data.session };

@@ -125,9 +125,9 @@ export default function ThresholdScreen() {
   }
 
   if (phase === 'breath') {
-    const bg = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.bordoDeep, colors.cream] });
+    const bg = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.bordo, colors.cream] });
     const wordColor = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.goldPale, colors.bordo] });
-    const lineColor = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.cream, colors.bordoInk] });
+    const lineColor = breathWarmth.interpolate({ inputRange: [0, 1], outputRange: [colors.cream, colors.bordo] });
 
     return (
       <Animated.View style={[styles.container, { backgroundColor: bg }]}>
@@ -149,9 +149,10 @@ export default function ThresholdScreen() {
   return (
     <Animated.View style={[styles.container, { opacity: leave.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
       <SafeAreaView style={styles.safe}>
-        <Animated.Text style={[styles.wordmark, { opacity: wordOpacity, transform: [{ translateY: wordRise }] }]}>
-          arafta.
-        </Animated.Text>
+        <Animated.View style={{ alignItems: 'center', opacity: wordOpacity, transform: [{ translateY: wordRise }] }}>
+          <Text style={styles.wordmark}>arafta.</Text>
+          <Text style={styles.subtitle}>20'ler kulübü</Text>
+        </Animated.View>
 
         <Animated.View style={[styles.doorWrap, { opacity: doorOpacity }]}>
           <LinearGradient colors={[colors.cream, colors.goldPale]} style={styles.door} />
@@ -167,7 +168,7 @@ export default function ThresholdScreen() {
           <Animated.Text
             style={[styles.tagline, { opacity: taglineOpacity, transform: [{ translateY: taglineRise }] }]}
           >
-            Her şeyin cevabını bilmek zorunda değilsin.
+            Yalnız değilsin. Burada herkes biraz arafta.
           </Animated.Text>
 
           <Animated.View style={{ opacity: ctaOpacity, transform: [{ translateY: ctaRise }] }}>
@@ -198,6 +199,14 @@ const styles = StyleSheet.create({
     fontFamily: type.display,
     fontSize: 26,
     color: colors.goldPale,
+  },
+  subtitle: {
+    fontFamily: type.body,
+    fontSize: 13,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: colors.gold,
+    marginTop: 4,
   },
   doorWrap: {
     width: '62%',

@@ -4,13 +4,12 @@ export const colors = {
   cream: '#FBF3E6',
   creamDim: '#F2E4CE',
   creamLine: 'rgba(74,18,32,0.12)',
-  bordo: '#380000',
+  bordo: '#2E0000',
   bordoDeep: '#220810',
   bordoInk: '#1D070D',
   bordoMuted: '#7C4B54',
   gold: '#CB9A4E',
   goldPale: '#E7CE9C',
-  goldGlow: 'rgba(203,154,78,0.55)',
 } as const;
 
 export const radii = {
@@ -27,37 +26,30 @@ export const editorial = {
   cream: '#FAF3E9',
   ivory: '#F5ECDD',
   beige: '#EDE0CB',
-  burgundy: '#380000',
-  burgundyDeep: '#4A1526',
+  burgundy: '#2E0000',
   ink: '#2A1810',
   inkSoft: '#7A6A5C',
   inkFaint: '#A8998A',
   line: 'rgba(42,24,16,0.13)',
   error: '#A6432F',
-  errorBg: '#F3E1DA',
   success: '#3E6B4A',
 } as const;
 
-// Ayarlar → Görünüm → Koyu tema. Jenerik ters çevirme değil, Arafta'nın
-// bordo + koyu kahverengi estetiğine uygun kendi paleti (bkz. arafta-settings
-// prototipi). Şu an yalnızca EditorialThemeProvider ile sarılı ekranlarda
-// (Ayarlar, ileride Auth/Profil) devreye giriyor — geri kalan uygulama etkilenmez.
-export const editorialDark = {
-  cream: '#241512',
-  ivory: '#2E1B17',
-  beige: '#3A231D',
-  burgundy: '#D97A93',
-  burgundyDeep: '#B85A73',
-  ink: '#F2E7DE',
-  inkSoft: '#C9B8AC',
-  inkFaint: '#8C7A6E',
-  line: 'rgba(242,231,222,0.1)',
-  error: '#E38267',
-  errorBg: '#402420',
-  success: '#7CB894',
-} as const;
 
-export type EditorialColors = Record<keyof typeof editorial, string>;
+// Keşfet ekranı için — kendi kapalı renk sistemi. Uygulamanın geri kalanı
+// yukarıdaki `colors` bordo/altın tonlarını kullanıyor; bunlar isteyerek
+// farklı (biraz daha canlı, "premium editorial") ve yalnızca Keşfet + hashtag
+// detay ekranında kullanılıyor, global markayı etkilemiyor.
+export const discover = {
+  cream: '#FBF3E6',
+  creamSecondary: '#F5ECDD', // = editorial.ivory ile birebir
+  bordo: '#2E0000',
+  bordoDeep: '#4A1220',
+  bordoLight: '#B85C74',
+  goldLight: '#E8C888',
+  ink: '#2B1710',
+  inkSoft: '#8C7364',
+} as const;
 
 export const editorialRadii = {
   chip: 10,

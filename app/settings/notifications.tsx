@@ -24,17 +24,17 @@ export default function NotificationsScreen() {
       <ScreenHeader title="Bildirim Ayarları" />
       <ScrollView style={styles.scroll}>
         <SettingsSection label="ETKİLEŞİMLER">
-          <ToggleRow label="Yeni takipçi" on={prefs.newFollower} onToggle={() => set('newFollower', !prefs.newFollower)} />
-          <ToggleRow label="Takip isteği" on={prefs.followRequest} onToggle={() => set('followRequest', !prefs.followRequest)} />
-          <ToggleRow label="Gönderime beğeni" on={prefs.postLike} onToggle={() => set('postLike', !prefs.postLike)} />
-          <ToggleRow label="Gönderime yorum" on={prefs.postComment} onToggle={() => set('postComment', !prefs.postComment)} />
-          <ToggleRow label="Mention" on={prefs.mention} onToggle={() => set('mention', !prefs.mention)} last />
+          <ToggleRow label="Paylaşımıma beğeni" on={prefs.postLike} onToggle={() => set('postLike', !prefs.postLike)} />
+          <ToggleRow label="Paylaşımıma yorum" on={prefs.postComment} onToggle={() => set('postComment', !prefs.postComment)} last />
         </SettingsSection>
 
-        <SettingsSection label="SOSYAL">
-          <ToggleRow label="Yeni takip edilen içerikler" on={prefs.newContent} onToggle={() => set('newContent', !prefs.newContent)} />
-          <ToggleRow label="Önerilen kişiler" on={prefs.suggestedPeople} onToggle={() => set('suggestedPeople', !prefs.suggestedPeople)} />
-          <ToggleRow label="Topluluk etkinlikleri" on={prefs.communityEvents} onToggle={() => set('communityEvents', !prefs.communityEvents)} last />
+        <SettingsSection label="ETİKETLER">
+          <ToggleRow
+            label="Takip ettiğim etiketlerde yeni paylaşım"
+            on={prefs.newContent}
+            onToggle={() => set('newContent', !prefs.newContent)}
+            last
+          />
         </SettingsSection>
 
         <SettingsSection label="SİSTEM">

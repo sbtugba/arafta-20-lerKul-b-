@@ -15,7 +15,6 @@ import {
 
 import { colors } from '../lib/theme';
 import { SessionProvider, useSession } from '../providers/SessionProvider';
-import { EditorialThemeProvider } from '../providers/EditorialThemeProvider';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -26,11 +25,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
-          <EditorialThemeProvider>
-            <SafeAreaProvider>
-              <AppGate />
-            </SafeAreaProvider>
-          </EditorialThemeProvider>
+          <SafeAreaProvider>
+            <AppGate />
+          </SafeAreaProvider>
         </SessionProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
@@ -85,6 +82,7 @@ function AppGate() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="post" />
+      <Stack.Screen name="topic" />
       <Stack.Screen
         name="share"
         options={{ presentation: 'transparentModal', animation: 'none' }}

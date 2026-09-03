@@ -27,10 +27,12 @@ export default function SignUpScreen() {
   return (
     <AuthForm
       title="Aramıza katıl"
-      subtitle="Bir e-posta ve şifre yeter, gerisini sonra hallederiz."
+      subtitle="Bir e-posta, şifre, kullanıcı adı ve doğum tarihin yeter, gerisini sonra hallederiz."
       submitLabel="Devam et"
       loadingLabel="Bir saniye…"
       minPasswordLength={8}
+      collectBirthdate
+      collectUsername
       onSubmit={signUp}
       onSuccess={(result) => {
         if (result.needsEmailConfirmation) setConfirmationSent(true);

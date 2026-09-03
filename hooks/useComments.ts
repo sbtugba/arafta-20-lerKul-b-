@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from '../lib/supabase';
 import type { Comment } from '../lib/types';
+import { fetchBlockedIds } from './useBlockedUsers';
 import { useSession } from './useSession';
 
 type CommentRow = {
@@ -38,17 +39,26 @@ async function fetchComments(postId: string, userId: string | null): Promise<Com
   if (error) throw error;
   if (!data || data.length === 0) return [];
 
+  // Engellenen kullanıcıların isimli yorumlarını süz (anonimde kimlik yok, süzülemez).
+  const blockedIds = await fetchBlockedIds(userId);
+  const rows = blockedIds.size ? data.filter((c) => c.is_anonymous || !blockedIds.has(c.author_id)) : data;
+  if (rows.length === 0) return [];
+
   // comments.author_id -> auth.users FK'si üzerinden geliyor, PostgREST embed
-  // profiles'a doğrudan bağlanamıyor; isimleri ayrı adımda çekiyoruz (bkz. usePosts.ts).
-  const namedAuthorIds = [...new Set(data.filter((c) => !c.is_anonymous).map((c) => c.author_id))];
+  // profiles'a doğrudan bağlanamıyor; isimleri ve avatarları ayrı adımda çekiyoruz (bkz. usePosts.ts).
+  const namedAuthorIds = [...new Set(rows.filter((c) => !c.is_anonymous).map((c) => c.author_id))];
   let namesById = new Map<string, string | null>();
+  let usernamesById = new Map<string, string | null>();
+  let avatarsById = new Map<string, string | null>();
   if (namedAuthorIds.length > 0) {
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, display_name')
+      .select('id, display_name, username, avatar_url')
       .in('id', namedAuthorIds);
     if (profilesError) throw profilesError;
     namesById = new Map((profiles ?? []).map((p) => [p.id, p.display_name]));
+    usernamesById = new Map((profiles ?? []).map((p) => [p.id, p.username]));
+    avatarsById = new Map((profiles ?? []).map((p) => [p.id, p.avatar_url]));
   }
 
   let likedIds = new Set<string>();
@@ -57,18 +67,20 @@ async function fetchComments(postId: string, userId: string | null): Promise<Com
       .from('comment_likes')
       .select('comment_id')
       .eq('user_id', userId)
-      .in('comment_id', data.map((c) => c.id));
+      .in('comment_id', rows.map((c) => c.id));
     if (likesError) throw likesError;
     likedIds = new Set((myLikes ?? []).map((l) => l.comment_id));
   }
 
-  const flat: Comment[] = data.map((row) => ({
+  const flat: Comment[] = rows.map((row) => ({
     id: row.id,
     postId: row.post_id,
     authorId: row.author_id,
     parentCommentId: row.parent_comment_id,
     isAnonymous: row.is_anonymous,
     authorDisplayName: row.is_anonymous ? null : (namesById.get(row.author_id) ?? null),
+    authorUsername: row.is_anonymous ? null : (usernamesById.get(row.author_id) ?? null),
+    authorAvatarUrl: row.is_anonymous ? null : (avatarsById.get(row.author_id) ?? null),
     body: row.body,
     createdAt: row.created_at,
     likeCount: row.like_count,

@@ -23,14 +23,8 @@ const PROFILE_COLUMNS = [
   'profile_questions',
   'links',
   'location',
-  'location_visible',
-  'profile_visible',
   'phone',
   'birthdate',
-  'show_age',
-  'show_interests',
-  'show_active',
-  'show_last_seen',
   'notification_prefs',
   'content_prefs',
 ].join(', ');
@@ -46,28 +40,17 @@ type ProfileRow = {
   profile_questions: ProfileQuestion[];
   links: ProfileLinks;
   location: string | null;
-  location_visible: boolean;
-  profile_visible: boolean;
   phone: string | null;
   birthdate: string | null;
-  show_age: boolean;
-  show_interests: boolean;
-  show_active: boolean;
-  show_last_seen: boolean;
   notification_prefs: Partial<Record<string, boolean>>;
   content_prefs: Partial<Record<string, boolean>>;
 };
 
 function mapNotificationPrefs(raw: ProfileRow['notification_prefs']): NotificationPrefs {
   return {
-    newFollower: raw.new_follower ?? DEFAULT_NOTIFICATION_PREFS.newFollower,
-    followRequest: raw.follow_request ?? DEFAULT_NOTIFICATION_PREFS.followRequest,
     postLike: raw.post_like ?? DEFAULT_NOTIFICATION_PREFS.postLike,
     postComment: raw.post_comment ?? DEFAULT_NOTIFICATION_PREFS.postComment,
-    mention: raw.mention ?? DEFAULT_NOTIFICATION_PREFS.mention,
     newContent: raw.new_content ?? DEFAULT_NOTIFICATION_PREFS.newContent,
-    suggestedPeople: raw.suggested_people ?? DEFAULT_NOTIFICATION_PREFS.suggestedPeople,
-    communityEvents: raw.community_events ?? DEFAULT_NOTIFICATION_PREFS.communityEvents,
     importantAnnouncements: raw.important_announcements ?? DEFAULT_NOTIFICATION_PREFS.importantAnnouncements,
     appUpdates: raw.app_updates ?? DEFAULT_NOTIFICATION_PREFS.appUpdates,
     emailProduct: raw.email_product ?? DEFAULT_NOTIFICATION_PREFS.emailProduct,
@@ -78,20 +61,14 @@ function mapContentPrefs(raw: ProfileRow['content_prefs']): ContentPrefs {
   return {
     reduceUninterested: raw.reduce_uninterested ?? DEFAULT_CONTENT_PREFS.reduceUninterested,
     sensitiveContent: raw.sensitive_content ?? DEFAULT_CONTENT_PREFS.sensitiveContent,
-    autoplay: raw.autoplay ?? DEFAULT_CONTENT_PREFS.autoplay,
   };
 }
 
 function notificationPrefsToRow(prefs: Partial<NotificationPrefs>) {
   const map: Record<string, string> = {
-    newFollower: 'new_follower',
-    followRequest: 'follow_request',
     postLike: 'post_like',
     postComment: 'post_comment',
-    mention: 'mention',
     newContent: 'new_content',
-    suggestedPeople: 'suggested_people',
-    communityEvents: 'community_events',
     importantAnnouncements: 'important_announcements',
     appUpdates: 'app_updates',
     emailProduct: 'email_product',
@@ -107,7 +84,6 @@ function contentPrefsToRow(prefs: Partial<ContentPrefs>) {
   const map: Record<string, string> = {
     reduceUninterested: 'reduce_uninterested',
     sensitiveContent: 'sensitive_content',
-    autoplay: 'autoplay',
   };
   const out: Record<string, boolean> = {};
   for (const [key, value] of Object.entries(prefs)) {
@@ -128,14 +104,8 @@ function mapRow(row: ProfileRow): Profile {
     questions: row.profile_questions ?? [],
     links: row.links ?? {},
     location: row.location,
-    locationVisible: row.location_visible,
-    profileVisible: row.profile_visible,
     phone: row.phone,
     birthdate: row.birthdate,
-    showAge: row.show_age,
-    showInterests: row.show_interests,
-    showActive: row.show_active,
-    showLastSeen: row.show_last_seen,
     notificationPrefs: mapNotificationPrefs(row.notification_prefs ?? {}),
     contentPrefs: mapContentPrefs(row.content_prefs ?? {}),
   };
@@ -146,12 +116,35 @@ async function fetchOrCreateProfile(userId: string): Promise<Profile> {
   if (error) throw error;
   if (data) return mapRow(data as unknown as ProfileRow);
 
+  // İlk profil satırı — kayıt formunda toplanan doğum tarihi ve kullanıcı adı
+  // auth metadata'sında bekliyor olabilir (bkz. providers/SessionProvider.tsx
+  // -> signUp), buradan alıp yazıyoruz.
+  const { data: userData } = await supabase.auth.getUser();
+  const metadata = userData.user?.user_metadata as { birthdate?: string; username?: string } | undefined;
+  const birthdate = metadata?.birthdate ?? null;
+  const username = metadata?.username ?? null;
+
   const { data: created, error: insertError } = await supabase
     .from('profiles')
-    .insert({ id: userId })
+    .insert({ id: userId, ...(birthdate ? { birthdate } : {}), ...(username ? { username } : {}) })
     .select(PROFILE_COLUMNS)
     .single();
-  if (insertError) throw insertError;
+
+  if (insertError) {
+    // Kayıt sırasında kontrol edilen kullanıcı adı, e-posta onayı beklerken
+    // başka biri tarafından alınmış olabilir (nadir yarış durumu) — hesabın
+    // oluşturulması bu yüzden çökmesin, kullanıcı adını boş bırakıp devam et.
+    if (insertError.code === UNIQUE_VIOLATION && username) {
+      const { data: retried, error: retryError } = await supabase
+        .from('profiles')
+        .insert({ id: userId, ...(birthdate ? { birthdate } : {}) })
+        .select(PROFILE_COLUMNS)
+        .single();
+      if (retryError) throw retryError;
+      return mapRow(retried as unknown as ProfileRow);
+    }
+    throw insertError;
+  }
 
   return mapRow(created as unknown as ProfileRow);
 }
@@ -173,14 +166,8 @@ export type ProfilePatch = Partial<{
   interests: string[];
   questions: ProfileQuestion[];
   links: ProfileLinks;
-  locationVisible: boolean;
-  profileVisible: boolean;
   phone: string;
   birthdate: string;
-  showAge: boolean;
-  showInterests: boolean;
-  showActive: boolean;
-  showLastSeen: boolean;
   notificationPrefs: Partial<NotificationPrefs>;
   contentPrefs: Partial<ContentPrefs>;
 }>;
@@ -216,14 +203,8 @@ export function useUpdateProfile() {
           ...(patch.interests !== undefined ? { interests: patch.interests } : {}),
           ...(patch.questions !== undefined ? { profile_questions: patch.questions } : {}),
           ...(patch.links !== undefined ? { links: patch.links } : {}),
-          ...(patch.locationVisible !== undefined ? { location_visible: patch.locationVisible } : {}),
-          ...(patch.profileVisible !== undefined ? { profile_visible: patch.profileVisible } : {}),
           ...(patch.phone !== undefined ? { phone: patch.phone } : {}),
           ...(patch.birthdate !== undefined ? { birthdate: patch.birthdate } : {}),
-          ...(patch.showAge !== undefined ? { show_age: patch.showAge } : {}),
-          ...(patch.showInterests !== undefined ? { show_interests: patch.showInterests } : {}),
-          ...(patch.showActive !== undefined ? { show_active: patch.showActive } : {}),
-          ...(patch.showLastSeen !== undefined ? { show_last_seen: patch.showLastSeen } : {}),
           ...(notificationPatch ? { notification_prefs: notificationPatch } : {}),
           ...(contentPatch ? { content_prefs: contentPatch } : {}),
         })

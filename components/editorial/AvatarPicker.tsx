@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 import { editorial } from '../../lib/theme';
@@ -12,28 +12,65 @@ function initials(p: Profile): string {
   return src ? src.charAt(0).toLocaleUpperCase('tr-TR') : '';
 }
 
+type PendingAction = { type: 'pick'; source: 'library' | 'camera' } | { type: 'remove' };
+
 export function AvatarPicker({ profile }: { profile: Profile }) {
   const uploadAvatar = useUploadAvatar();
   const removeAvatar = useRemoveAvatar();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const busy = uploadAvatar.isPending || removeAvatar.isPending;
 
-  async function pick(source: 'library' | 'camera') {
+  // iOS, bir Modal tam kapanmadan native galeri/kamera seçiciyi (o da bir view
+  // controller) açmaya izin vermiyor — sessizce hiçbir şey olmuyormuş gibi
+  // görünüyor. Bu yüzden menüyü kapatıp asıl işlemi Modal'ın onDismiss'inde
+  // (iOS'ta gerçek kapanma animasyonu bitince) çalıştırıyoruz.
+  function requestAction(action: PendingAction) {
+    setPendingAction(action);
     setMenuOpen(false);
+    if (Platform.OS !== 'ios') runPendingAction(action);
+  }
+
+  function runPendingAction(action: PendingAction) {
+    if (action.type === 'remove') {
+      removeAvatar.mutate(undefined, {
+        onError: () => Alert.alert('Bir şeyler ters gitti', 'Fotoğraf kaldırılamadı, lütfen tekrar dene.'),
+      });
+    } else {
+      pick(action.source);
+    }
+  }
+
+  async function pick(source: 'library' | 'camera') {
     const perm =
       source === 'library'
         ? await ImagePicker.requestMediaLibraryPermissionsAsync()
         : await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      Alert.alert(
+        source === 'library' ? 'Galeriye erişim gerekiyor' : 'Kameraya erişim gerekiyor',
+        'İzin daha önce reddedilmiş olabilir. Ayarlar > Arafta üzerinden izni açabilirsin.',
+        perm.canAskAgain || Platform.OS === 'web'
+          ? undefined
+          : [{ text: 'Vazgeç', style: 'cancel' }, { text: 'Ayarları Aç', onPress: () => Linking.openSettings() }]
+      );
+      return;
+    }
 
-    const result = await (source === 'library' ? ImagePicker.launchImageLibraryAsync : ImagePicker.launchCameraAsync)({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      uploadAvatar.mutate(result.assets[0].uri);
+    try {
+      const result = await (source === 'library' ? ImagePicker.launchImageLibraryAsync : ImagePicker.launchCameraAsync)({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        uploadAvatar.mutate(result.assets[0].uri, {
+          onError: () => Alert.alert('Bir şeyler ters gitti', 'Fotoğraf yüklenemedi, lütfen tekrar dene.'),
+        });
+      }
+    } catch {
+      Alert.alert('Bir şeyler ters gitti', source === 'library' ? 'Galeri açılamadı.' : 'Kamera açılamadı.');
     }
   }
 
@@ -61,22 +98,31 @@ export function AvatarPicker({ profile }: { profile: Profile }) {
 
       {!profile.avatarUrl ? <Text style={styles.hint}>Fotoğraf eklemek için dokun</Text> : null}
 
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+        onDismiss={() => {
+          if (pendingAction) {
+            const action = pendingAction;
+            setPendingAction(null);
+            runPendingAction(action);
+          }
+        }}
+      >
         <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)}>
           <View style={styles.menu}>
-            <Pressable style={styles.menuItem} onPress={() => pick('library')}>
+            <Pressable style={styles.menuItem} onPress={() => requestAction({ type: 'pick', source: 'library' })}>
               <Text style={styles.menuLabel}>Galeriden seç</Text>
             </Pressable>
-            <Pressable style={styles.menuItem} onPress={() => pick('camera')}>
+            <Pressable style={styles.menuItem} onPress={() => requestAction({ type: 'pick', source: 'camera' })}>
               <Text style={styles.menuLabel}>Kameradan çek</Text>
             </Pressable>
             {profile.avatarUrl ? (
               <Pressable
                 style={[styles.menuItem, styles.menuItemLast]}
-                onPress={() => {
-                  setMenuOpen(false);
-                  removeAvatar.mutate();
-                }}
+                onPress={() => requestAction({ type: 'remove' })}
               >
                 <Text style={[styles.menuLabel, styles.menuLabelDanger]}>Fotoğrafı kaldır</Text>
               </Pressable>

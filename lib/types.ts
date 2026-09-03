@@ -3,6 +3,8 @@ export type Post = {
   authorId: string;
   isAnonymous: boolean;
   authorDisplayName: string | null;
+  authorUsername: string | null;
+  authorAvatarUrl: string | null;
   body: string;
   tags: string[];
   reactionCount: number;
@@ -18,6 +20,8 @@ export type Comment = {
   parentCommentId: string | null;
   isAnonymous: boolean;
   authorDisplayName: string | null;
+  authorUsername: string | null;
+  authorAvatarUrl: string | null;
   body: string;
   createdAt: string;
   likeCount: number;
@@ -25,6 +29,27 @@ export type Comment = {
   isMine: boolean;
   replies: Comment[];
 };
+
+// Paylaşım/yorumlarda görünecek isim: ikisi de varsa "İsim @kullaniciadi",
+// yalnız biri varsa o, ikisi de yoksa (eski/eksik profiller için) jenerik "biri".
+export function displayNameFor(displayName: string | null, username: string | null): string {
+  if (displayName && username) return `${displayName} @${username}`;
+  if (displayName) return displayName;
+  if (username) return `@${username}`;
+  return 'biri';
+}
+
+export function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'şimdi';
+  if (minutes < 60) return `${minutes} dk önce`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} sa önce`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} gün önce`;
+  return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+}
 
 export type ProfileQuestion = {
   q: string;
@@ -34,14 +59,9 @@ export type ProfileQuestion = {
 export type ProfileLinks = Partial<Record<'instagram' | 'spotify' | 'letterboxd' | 'goodreads', string>>;
 
 export type NotificationPrefs = {
-  newFollower: boolean;
-  followRequest: boolean;
   postLike: boolean;
   postComment: boolean;
-  mention: boolean;
   newContent: boolean;
-  suggestedPeople: boolean;
-  communityEvents: boolean;
   importantAnnouncements: boolean;
   appUpdates: boolean;
   emailProduct: boolean;
@@ -50,18 +70,12 @@ export type NotificationPrefs = {
 export type ContentPrefs = {
   reduceUninterested: boolean;
   sensitiveContent: boolean;
-  autoplay: boolean;
 };
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
-  newFollower: true,
-  followRequest: true,
   postLike: true,
   postComment: true,
-  mention: true,
   newContent: true,
-  suggestedPeople: false,
-  communityEvents: true,
   importantAnnouncements: true,
   appUpdates: false,
   emailProduct: false,
@@ -70,7 +84,6 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
 export const DEFAULT_CONTENT_PREFS: ContentPrefs = {
   reduceUninterested: true,
   sensitiveContent: false,
-  autoplay: true,
 };
 
 export type Profile = {
@@ -84,14 +97,8 @@ export type Profile = {
   questions: ProfileQuestion[];
   links: ProfileLinks;
   location: string | null;
-  locationVisible: boolean;
-  profileVisible: boolean;
   phone: string | null;
   birthdate: string | null;
-  showAge: boolean;
-  showInterests: boolean;
-  showActive: boolean;
-  showLastSeen: boolean;
   notificationPrefs: NotificationPrefs;
   contentPrefs: ContentPrefs;
 };
@@ -156,21 +163,16 @@ export const REPORT_REASONS = [
   'Diğer',
 ] as const;
 
-export const DELETE_ACCOUNT_REASONS = [
-  'Uygulamayı artık kullanmıyorum',
-  'Gizlilik konusunda endişeliyim',
-  'İstediğim topluluğu bulamadım',
-  'Çok fazla bildirim alıyorum',
-  'Teknik bir sorun yaşıyorum',
-  'Diğer',
-] as const;
-
 export type BlockedUser = {
   id: string;
   displayName: string | null;
   username: string | null;
   avatarUrl: string | null;
 };
+
+export function formatCount(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`;
+}
 
 export const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 

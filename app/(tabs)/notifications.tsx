@@ -1,45 +1,57 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, type } from '../../lib/theme';
+import { relativeTime } from '../../lib/types';
+import { useNotifications, useMarkNotificationsRead, type NotificationType } from '../../hooks/useNotifications';
 import { TopBar } from '../../components/TopBar';
-import { BellIcon, HeadphoneIcon, TalkIcon } from '../../components/icons';
+import { HeartIcon, HeadphoneIcon, TalkIcon } from '../../components/icons';
 
-const NOTIFICATIONS = [
-  {
-    icon: BellIcon,
-    text: '128 kişi paylaşımında kendini buldu — "25 yaşındayım ve hâlâ..."',
-    time: '2 saat önce',
-  },
-  {
-    icon: TalkIcon,
-    text: 'emre paylaşımına yorum yaptı: "ben de tam olarak böyle hissediyorum..."',
-    time: 'Dün',
-  },
-  {
-    icon: HeadphoneIcon,
-    text: 'Yeni bölüm yayında: "Herkes ilerliyor, ben neden yerimdeyim?"',
-    time: '3 gün önce',
-  },
-];
+const ICON_BY_TYPE: Record<NotificationType, typeof HeartIcon> = {
+  post_like: HeartIcon,
+  post_comment: TalkIcon,
+  comment_like: HeartIcon,
+  podcast: HeadphoneIcon,
+};
 
 export default function NotificationsScreen() {
+  const { data: notifications, isLoading } = useNotifications();
+  const markRead = useMarkNotificationsRead();
+
+  // Bildirimler sekmesini açmak, kişiye özel bildirimleri okunmuş sayar —
+  // yayın bildirimleri (podcast) zaten "okundu" takip etmiyor (bkz. hook).
+  useEffect(() => {
+    markRead.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <TopBar />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.eyebrow}>BİLDİRİMLER</Text>
-        {NOTIFICATIONS.map((n, i) => (
-          <View key={i} style={styles.row}>
-            <View style={styles.iconWrap}>
-              <n.icon size={15} color={colors.gold} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.text}>{n.text}</Text>
-              <Text style={styles.time}>{n.time}</Text>
-            </View>
-          </View>
-        ))}
+        {!isLoading && notifications?.length === 0 ? <Text style={styles.empty}>Henüz bir bildirimin yok.</Text> : null}
+        {(notifications ?? []).map((n) => {
+          const Icon = ICON_BY_TYPE[n.type];
+          return (
+            <Pressable
+              key={n.id}
+              style={styles.row}
+              disabled={!n.postId}
+              onPress={() => n.postId && router.push(`/post/${n.postId}`)}
+            >
+              <View style={styles.iconWrap}>
+                <Icon size={15} color={colors.gold} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.text}>{n.body}</Text>
+                <Text style={styles.time}>{relativeTime(n.createdAt)}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -90,5 +102,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.bordoMuted,
     marginTop: 3,
+  },
+  empty: {
+    fontFamily: type.body,
+    fontSize: 14,
+    color: colors.bordoMuted,
+    paddingVertical: 20,
   },
 });

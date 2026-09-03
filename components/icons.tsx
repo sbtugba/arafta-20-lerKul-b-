@@ -163,6 +163,17 @@ export function MoreIcon({ size = 18, color = '#000' }: IconProps) {
   );
 }
 
+export function SlidersIcon({ size = 17, color = '#000' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round">
+      <Path d="M4 6h9M17 6h3M4 12h3M9 12h11M4 18h13M21 18h-1" />
+      <Circle cx={13} cy={6} r={2} />
+      <Circle cx={7} cy={12} r={2} />
+      <Circle cx={16} cy={18} r={2} />
+    </Svg>
+  );
+}
+
 export function ShareIcon({ size = 17, color = '#000' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">

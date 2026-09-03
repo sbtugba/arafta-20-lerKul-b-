@@ -9,11 +9,14 @@ import { TextLink, TextLinkEmphasis } from '../../components/editorial/TextLink'
 export default function AuthChoiceScreen() {
   return (
     <SafeAreaView style={styles.safe}>
-      <Text style={styles.wordmark}>arafta.</Text>
+      <View style={styles.brand}>
+        <Text style={styles.wordmark}>arafta.</Text>
+        <Text style={styles.brandSub}>20'ler kulübü</Text>
+      </View>
 
       <View style={styles.mid}>
-        <Text style={styles.headline}>Hayatın henüz bir yere oturmadıysa, burada yalnız değilsin.</Text>
-        <Text style={styles.sub}>Arafta, aynı belirsizlikte olan insanların bir araya geldiği yer.</Text>
+        <Text style={styles.headline}>Herkes büyüdüğünü söylüyor ama kimse nasıl yetişkin olunacağını anlatmıyor.</Text>
+        <Text style={styles.sub}>20'li yaşların bütün belirsizliği, kaygısı ve “ben şimdi ne yapacağım?”ları için buradayız.</Text>
       </View>
 
       <View style={styles.bottom}>
@@ -35,10 +38,20 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
     justifyContent: 'space-between',
   },
+  brand: {
+    gap: 2,
+  },
   wordmark: {
     fontFamily: 'Fraunces_600SemiBold_Italic',
     fontSize: 19,
     color: editorial.burgundy,
+  },
+  brandSub: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: editorial.inkFaint,
   },
   mid: {
     marginTop: 40,

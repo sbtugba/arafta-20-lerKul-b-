@@ -5,19 +5,17 @@ import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native
 
 import { colors, type } from '../../lib/theme';
 import { usePosts, useToggleReaction } from '../../hooks/usePosts';
+import { useWeeklyPodcast } from '../../hooks/useWeeklyPodcast';
 import { PostCard } from '../../components/PostCard';
 import { PodcastCard } from '../../components/PodcastCard';
 import { TopBar } from '../../components/TopBar';
 import { CloseIcon } from '../../components/icons';
 
-const WEEKLY_QUOTE = 'Hayatımı kurmaya neden bu kadar geç kaldığımı hissediyorum?';
-const EPISODE_TITLE = 'Herkes ilerliyor, ben neden yerimdeyim?';
-const SPOTIFY_URL = 'https://open.spotify.com';
-
 export default function FeedScreen() {
   const { topic } = useLocalSearchParams<{ topic?: string }>();
   const { data: posts, isLoading, isFetching, refetch } = usePosts(topic);
   const toggleReaction = useToggleReaction();
+  const { data: podcast } = useWeeklyPodcast();
 
   const listData = posts ?? [];
 
@@ -59,8 +57,8 @@ export default function FeedScreen() {
         renderItem={({ item, index }) => (
           <>
             <PostCard post={item} onToggleReaction={() => toggleReaction.mutate({ postId: item.id, hasReacted: item.hasReacted })} />
-            {index === 0 && !topic ? (
-              <PodcastCard weeklyTopicQuote={WEEKLY_QUOTE} episodeTitle={EPISODE_TITLE} spotifyUrl={SPOTIFY_URL} />
+            {index === 0 && !topic && podcast ? (
+              <PodcastCard weeklyTopicQuote={podcast.quote} episodeTitle={podcast.episodeTitle} spotifyUrl={podcast.spotifyUrl} />
             ) : null}
           </>
         )}

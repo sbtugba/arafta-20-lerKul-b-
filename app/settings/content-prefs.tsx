@@ -35,12 +35,6 @@ export default function ContentPrefsScreen() {
             value="Zor konulardaki paylaşımlar önce bir uyarıyla gösterilir."
             on={prefs.sensitiveContent}
             onToggle={() => set('sensitiveContent', !prefs.sensitiveContent)}
-          />
-          <ToggleRow
-            label="Otomatik oynatma"
-            value="Akışta içerikler kendiliğinden oynamaya başlar."
-            on={prefs.autoplay}
-            onToggle={() => set('autoplay', !prefs.autoplay)}
             last
           />
         </SettingsSection>

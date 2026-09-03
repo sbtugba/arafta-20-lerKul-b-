@@ -4,6 +4,14 @@ import { supabase } from '../lib/supabase';
 import type { BlockedUser } from '../lib/types';
 import { useSession } from './useSession';
 
+// Engellenen kullanıcı id'leri — feed ve yorumları süzmek için (bkz. usePosts, useComments).
+export async function fetchBlockedIds(userId: string | null): Promise<Set<string>> {
+  if (!userId) return new Set();
+  const { data, error } = await supabase.from('blocks').select('blocked_id').eq('blocker_id', userId);
+  if (error) throw error;
+  return new Set((data ?? []).map((b) => b.blocked_id));
+}
+
 export function useBlockedUsers() {
   const { userId } = useSession();
   return useQuery({
@@ -46,7 +54,11 @@ export function useBlockUser() {
       const { error } = await supabase.from('blocks').insert({ blocker_id: userId, blocked_id: blockedId });
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blocked-users', userId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blocked-users', userId] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['comments'] });
+    },
   });
 }
 
@@ -59,6 +71,10 @@ export function useUnblockUser() {
       const { error } = await supabase.from('blocks').delete().eq('blocker_id', userId).eq('blocked_id', blockedId);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blocked-users', userId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blocked-users', userId] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['comments'] });
+    },
   });
 }

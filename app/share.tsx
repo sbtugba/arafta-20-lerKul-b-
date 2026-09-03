@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
@@ -17,10 +17,13 @@ const DISMISS_THRESHOLD = SHEET_TRAVEL * 0.32;
 const FLING_VELOCITY = 900;
 
 export default function ShareModal() {
-  const [step, setStep] = useState<'picker' | 'composer'>('picker');
+  // Keşfet'te aranan bir konu için sonuç çıkmadığında ("Belki ilk sen
+  // söylersin.") doğrudan o etiket önceden dolu şekilde composer'a düşer.
+  const { tag: prefillTag } = useLocalSearchParams<{ tag?: string }>();
+  const [step, setStep] = useState<'picker' | 'composer'>(prefillTag ? 'composer' : 'picker');
   const [mode, setMode] = useState<Mode>('Anonim');
   const [body, setBody] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(prefillTag ? [prefillTag] : []);
   const [tagInput, setTagInput] = useState('');
   const [addingTag, setAddingTag] = useState(false);
 
@@ -85,9 +88,17 @@ export default function ShareModal() {
 
   async function submit() {
     if (!body.trim()) return;
+
+    // "konu ekle" alanına yazıp Enter'a basmadan/çıkmadan doğrudan "Bırak."a
+    // basılırsa commitTag hiç tetiklenmemiş olabilir — henüz işlenmemiş
+    // tagInput'u burada da hesaba katıyoruz, yoksa yazılan konu sessizce
+    // kaybolup varsayılan 'arafta' etiketine düşüyordu.
+    const pending = tagInput.trim().toLocaleLowerCase('tr-TR').replace(/^#/, '');
+    const finalTags = pending ? Array.from(new Set([...tags, pending])) : tags;
+
     await createPost.mutateAsync({
       body: body.trim(),
-      tags: tags.length ? tags : ['arafta'],
+      tags: finalTags.length ? finalTags : ['arafta'],
       isAnonymous: mode === 'Anonim',
     });
     animateClose();
